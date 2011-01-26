@@ -12,7 +12,7 @@ class TextileOutputGenerator
 	static public function TidyLineBreaks( &$in )
 	{
 //		$block = self::$parser->doPBr($block);
-		$block = preg_replace('/<br>/', '<br />', $block);
+		$in = preg_replace('/<br>/', '<br />', $in);	# TODO: Speed this up -- No need for preg_ here.
 	}
 
 
@@ -63,6 +63,25 @@ class TextileOutputGenerator
 		return array($o1, $o2, $content, $c2, $c1, $eat);
 	}
 
+
+  static public function FootnoteIDHandler($id, $nolink, $t)
+	{
+		$backref = '';
+	
+		if( self::$parser->GetFootnoteID( $id ) === $id ) {
+		  $a = uniqid(rand());
+		  self::$parser->DefineFootnoteID( $id, $a );
+			$backref = 'id="fnrev'.$a.'" ';
+		}
+
+		$fnid = self::$parser->GetFootnoteID( $id );
+
+		$footref = ( '!' == $nolink ) ? $id : '<a href="#fn'.$fnid.'">'.$id.'</a>';
+		$footref = '<sup '.$backref.'class="footnote">'.$footref.'</sup>';
+
+		return $footref;
+	}
+ 
 
 	static public function fn_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{

@@ -56,6 +56,7 @@ class Textile
 	protected $spans            = array();
 	protected $patterns         = null;
 	protected $blocktags        = array();
+	protected $restricted       = true;
 
 	/**
 	 *
@@ -172,7 +173,7 @@ class Textile
 
 			if ($element == 'td' or $element == 'tr') {
 				if (preg_match("/($this->patterns->vlgn)/", $matched, $vert))
-					$style[] = "vertical-align:" . $this->vAlign($vert[1]);
+					$style[] = "vertical-align:" . $this->vAlign($vert[1]);	# TODO no coverage of vAlign in current test cases.
 			}
 
 			if (preg_match("/\{([^}]*)\}/", $matched, $sty)) {
@@ -202,7 +203,7 @@ class Textile
 			}
 
 			if (preg_match("/({$this->patterns->hlgn})/", $matched, $horiz))
-				$style[] = "text-align:" . $this->hAlign($horiz[1]);
+				$style[] = "text-align:" . $this->HorizontalAlign($horiz[1]);
 
       # If a textile class block attribute was found, split it into the css class and css id (if any)...
 			if (preg_match("/^([-a-zA-Z0-9_]*)#([-a-zA-Z0-9_\.\:]*)$/", $class, $ids)) {
@@ -279,6 +280,10 @@ class Textile
 
 		return $id;
 	}
+	public function DefineFootnoteID( $id, $a )
+	{
+		$this->fn[$id] = $a;
+	}
 
 	function EncodeHTML($str, $quotes=1)
 	{
@@ -312,6 +317,49 @@ class Textile
 	}
 
 
+  protected function _ParseParagraph( $text )
+	{
+		if (!$this->lite) {
+#			$text = $this->noTextile($text);
+#			$text = $this->code($text);
+		}
+
+#		$text = $this->getRefs($text);
+#		$text = $this->links($text);
+#		if (!$this->noimage)
+#			$text = $this->image($text);
+
+		if (!$this->lite) {
+#			$text = $this->table($text);
+#			$text = $this->lists($text);
+		}
+
+#		$text = $this->span($text);
+		$text = $this->_ParseFootnoteRefs($text);
+#		$text = $this->noteRef($text);
+#		$text = $this->glyphs($text);
+
+		return rtrim($text, "\n");
+	}
+
+
+	protected function _ParseFootnoteRefs($text)
+	{
+		return preg_replace(
+		  '/(?<=\S)\[([0-9]+)([\!]?)\](\s)?/Ue',
+		  '$this->_FootnoteRefFound(\'\1\',\'\2\',\'\3\')', 
+			$text
+			);
+	}
+	protected function _FootnoteRefFound($id, $nolink, $t)
+	{
+		$this->TriggerParseEvent( 'graf:fnref' , $id , $nolink, $t );
+#		if( is_callable( TextileOutputGenerator::FootnoteIDHandler( $id, $nolink, $t ) ) )
+			return call_user_func( 'TextileOutputGenerator::FootnoteIDHandler', $id, $nolink, $t );
+#		return $t;
+	}
+
+
   /**
 	 * @method _ParseBlocks
 	 */
@@ -320,10 +368,6 @@ class Textile
 		$find = $this->blocktags;
 
 		if( $this->lite === '' ) {
-#			self::RegisterBlockHandler( '###', 			 'Textile::_comment_block_handler' );
-#			self::RegisterBlockHandler( 'pre', 			 'Textile::_pre_block_handler' );
-#			self::RegisterBlockHandler( 'notextile', 'Textile::_notextile_block_handler');
-#			self::RegisterBlockHandler( 'bc', 			 'Textile::_bc_block_handler');
 			$find = array_merge( $find, array_keys( $this->block_handlers ) );
 		}
 		$tre  = implode('|', $find);
@@ -334,7 +378,6 @@ class Textile
 		$atts = $cite = $graf = $ext = '';
 		$eat = false;
 		$out = array();
-#		$atts_pattern = ;
 
 		foreach($blocks as $block) {
 			$anon = 0;
@@ -358,7 +401,7 @@ class Textile
 				if ($ext or !preg_match('/^ /', $block)) {
 					list($o1, $o2, $content, $c2, $c1, $eat) = $this->_fBlock(array(0,$tag,$atts,$ext,$cite,$block));
 					// skip $o1/$c1 because this is part of a continuing extended block
-					if ($tag == 'p' /*and !$this->hasRawText($content)*/) {
+					if ($tag == 'p' and !$this->HasRawText($content)) {
 						$block = $content;
 					}
 					else {
@@ -366,7 +409,7 @@ class Textile
 					}
 				}
 				else {
-//					$block = $this->graf($block);
+					$block = $this->_ParseParagraph($block);
 				}
 			}
 
@@ -392,9 +435,19 @@ class Textile
 		return $out;
 	}
 
+	function HasRawText($text)
+	{
+	  # TODO This list needs to be expandable!
+		// checks whether the text has text not already enclosed by a block tag
+		$r = trim(preg_replace('@<(p|blockquote|div|form|table|ul|ol|dl|pre|h\d)[^>]*?'.chr(62).'.*</\1>@s', '', trim($text)));
+		$r = trim(preg_replace('@<(hr|br)[^>]*?/>@', '', $r));
+		return '' != $r;
+	}
+
 
 	static protected function TryOutputHandler( $name, &$in )
 	{
+		# TODO: Trigger parse event
 		$name = "TextileOutputGenerator::$name";
 		if( !is_callable( $name ) ) {
 #echo "No output handler matching [$name] found.\n";
@@ -407,11 +460,12 @@ class Textile
 
 	public function TextileThis( $text, $lite = '', $encode = '', $noimage = '', $strict = '', $rel = '' )
 	{
-		$this->lite    = $lite;
-		$this->encode  = $encode;
-		$this->noimage = $noimage;
-		$this->strict  = $strict;
-		$this->rel     = $rel;
+		$this->lite       = $lite;
+		$this->encode     = $encode;
+		$this->noimage    = $noimage;
+		$this->strict     = $strict;
+		$this->rel        = $rel;
+		$this->restricted = false;
 
 		#
 		$text = $this->CleanWhiteSpace( $text );
@@ -471,7 +525,7 @@ class Textile
 
 //$this->dump( $content );
 
-		$content = (!$eat) ? /*$this->graf($content)*/$content : '';
+		$content = (!$eat) ? $this->_ParseParagraph($content) : '';
 		return array($o1, $o2, $content, $c2, $c1, $eat);
 	}
 
@@ -491,6 +545,17 @@ class Textile
 			call_user_func( $listener, $args );
 		}
 	}
+
+	protected function HorizontalAlign($in)
+	{
+		$vals = array(
+			'<'  => 'left',
+			'='  => 'center',
+			'>'  => 'right',
+			'<>' => 'justify');
+		return (isset($vals[$in])) ? $vals[$in] : '';
+	}
+
 
 	/**
 	 * 
