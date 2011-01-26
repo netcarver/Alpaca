@@ -1,0 +1,14 @@
+h1. Alpaca -- A Flexible Textile Parser Implemented in PHP
+
+h2. Goals
+
+Alpaca aims to...
+
+# extend Textile from its 'text to HTML' origins by separating the textile _parser_ from the _output generator_
+# encourage Textile to develop as a lightweight abstract markup standard, not just as a 'text to HTML' converter
+# allow for extensions to the basic textile standard via a plugin mechanism called 'fleeces'
+
+...whilst providing support for generation of the following output formats...
+
+* HTML (the default)
+* Markdown
