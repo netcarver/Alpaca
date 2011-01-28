@@ -116,6 +116,29 @@ class TextileOutputGenerator
 	}
 
 
+	static public function default_SpanHandler( $span, $m )
+	{
+		list(, $pre, $tag, $atts, $cite, $content, $end, $tail) = $m;
+
+#self::$parser->dump( "Called with [$span], matched [$tag] => span2[$span2]." );
+
+		$atts = self::$parser->ParseBlockAttributes($atts);
+		$atts .= ($cite != '') ? 'cite="' . $cite . '"' : '';
+
+//		$content = self::$parser->span($content);	# TODO Will need to do this to recursively parse a span.
+
+		$opentag = '<'.$span.$atts.'>';
+		$closetag = '</'.$span.'>';
+//		$tags = $this->storeTags($opentag, $closetag);	# TODO Will need to do this to allow glyphing around spans.
+//		$out = "{$tags['open']}{$content}{$end}{$tags['close']}";
+		$out = "$opentag{$content}{$end}$closetag"; # fixme temp output
+
+		if (($pre and !$tail) or ($tail and !$pre))
+			$out = $pre.$out.$tail;
+
+		return $out;
+	}
+
 
 	static public function default_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{

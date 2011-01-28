@@ -9,7 +9,8 @@ class TextileUnexpectedException extends Exception {}
 class TextileProgrammerException extends TextileUnexpectedException {}	# Thrown for incorrect setup which needs to fail early and loud.
 
 /**
- * Helper class ...
+ * Helper class allows function chaining to set data...
+ * data_bag->name1(value1)->name2(value2);
  */
 class TextileDataBag
 {
@@ -43,6 +44,38 @@ class TextileDataBag
 	}
 }
 
+class TextileSpanBag extends TextileDataBag
+{
+  public function addSpan( $name, $marker )  # Adds a symmetric span (where open marker is the same as the close marker)
+	{
+		return $this->addAsymmetricSpan( $name, $marker, $marker );
+	}
+
+	public function addAsymmetricSpan( $name, $openmark, $closemark )
+	{
+		$this->data[$name] = array( 'open' => $openmark, 'close' => $closemark );
+		return $this;
+	}
+
+	public function __call($name, $value)
+	{
+	  return $this->addAsymmetricSpan( $name, $value[0], $value[0] );
+	}
+
+	public function __get($name)
+	{
+		return $this->data;
+	}
+
+	public function lookupSpanName($open,$close=null)
+	{
+		if( null === $close ) $close = $open;
+		$needle = array('open'=>$open, 'close'=>$close);
+		return array_search( $needle , $this->data );
+	}
+}
+
+
 /**
  *
  */
@@ -50,13 +83,15 @@ class Textile
 {
 	protected $output_type      = null;
   protected $output_generator = null;
-  protected $parse_listeners  = array();
-	protected $block_handlers   = array();
-	protected $glyphs           = array();
-	protected $spans            = array();
-	protected $patterns         = null;
+  protected $parse_listeners  = array();	# DB of listeners to parse events.
+	protected $block_handlers   = array();	# DB of registered textplug callbacks
+	protected $glyphs           = null;			# standard-textile glyph markers
+	protected $patterns         = null;			# standard-textile regex patterns
+	protected $spans            = null;			# standard-textile span start/end markers
 	protected $blocktags        = array();
-	protected $restricted       = true;
+	protected $restricted       = true;			# Textile runs in restricted mode unless invoked via 'TextileThis()'
+	protected $span_depth;
+	protected $max_span_depth;
 
 	/**
 	 *
@@ -77,14 +112,35 @@ class Textile
 		  ->a   ("(?:{$this->patterns->hlgn}|{$this->patterns->vlgn})*")
 		  ->s   ("(?:{$this->patterns->cspn}|{$this->patterns->rspn})*")
 		  ->c   ("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge}|{$this->patterns->hlgn})*")
-		  ->lc  ("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge})*");
+		  ->lc  ("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge})*")
+			;
+
+		/**
+		 *	By default, the standard textile spans are now *named* after the HTML tag that should be emmitted for them.
+		 */
+		$this->spans = new TextileSpanBag();
+		$this->spans
+			->b('**')
+			->strong('*')
+			->cite('??')
+		  ->del('-')
+      ->i('__')
+			->em('_')
+		  ->span('%')
+			->ins('+')
+			->sub('~')
+			->sup('^')
+			;
 
 #$this->dump( $this->patterns );
 
 		# Load the generator config...
-		$generator = "./generators/$type.php";
+		$generator = "./generators/$type.php";	# TODO allow location to be redefined.
 		include_once( $generator );
 		$this->output_generator = new TextileOutputGenerator( $this );
+
+		$this->span_depth = 0;
+		$this->max_span_depth = 5;	# TODO make this configurable
 	}
 
 
@@ -122,10 +178,32 @@ class Textile
 	{
 	}
 
-	public function DefineSpan( $name, $marker, $replacement )
+	/**
+	 *	Allows plugins to extend the standard set of textile spans...
+	 */
+	public function DefineSpan( $name, $openmarker, $closemarker = null )
 	{
+		if( !is_string($name) || empty($name) )
+			throw new TextileProgrammerException( 'Invalid span $name -- should be a non-empty string.' );
+		if( !is_string($openmarker) || empty($openmarker) )
+			throw new TextileProgrammerException( 'Invalid $openmarker given -- should be a non-empty string.' );
+		if( null === $closemarker) 
+			$closemarker = $openmarker;
+		else {
+			if( !is_string($closemarker) || empty($closemarker) )
+				throw new TextileProgrammerException( 'Invalid $closemarker given -- should be ommited, set to null or a non-empty string.' );
+		}
+
+		$this->spans->addAsymmetricSpan( $name, $openmarker, $closemarker );
 	}
 
+	/**
+	 *	Allows reverse lookup of span names from the open and (optionally) close markers.
+	 */
+	public function LookupSpanName( $open, $close=null )
+	{
+		return $this->spans->lookupSpanName($open, $close);
+	}
 
   /**
 	 * @method Cleanse
@@ -192,7 +270,7 @@ class Textile
 				$matched = str_replace($cls[0], '', $matched);
 			}
 
-			if (preg_match("/([(]+)/", $matched, $pl)) {
+			if (preg_match("/([(]+)/", $matched, $pl)) {	# TODO: Add unit switching - pts/pixels/etc?
 				$style[] = "padding-left:" . strlen($pl[1]) . "em";
 				$matched = str_replace($pl[0], '', $matched);
 			}
@@ -334,7 +412,7 @@ class Textile
 #			$text = $this->lists($text);
 		}
 
-#		$text = $this->span($text);
+		$text = $this->_ParseSpans($text);
 		$text = $this->_ParseFootnoteRefs($text);
 #		$text = $this->noteRef($text);
 #		$text = $this->glyphs($text);
@@ -342,6 +420,49 @@ class Textile
 		return rtrim($text, "\n");
 	}
 
+
+	protected function _ParseSpans($text)
+	{
+		$spans = $this->spans->data;
+		$pnct = ".,\"'?!;:";
+		$this->span_depth++;
+		static $subs = array( '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?' );
+
+		if( $this->span_depth <= $this->max_span_depth )
+		{
+			foreach($spans as $span=>$markers)
+			{
+				$open  = strtr( $markers['open'],  $subs );
+				$close = strtr( $markers['close'], $subs );
+				$this->current_span = $span;
+				$text = preg_replace_callback("/
+					(^|(?<=[\s>$pnct\(])|[{[])        # pre
+					($open)(?!$open)                  # tag
+					({$this->patterns->c})            # atts
+					(?::(\S+))?                       # cite
+					([^\s$close]+|\S.*?[^\s$close\n]) # content
+					([$pnct]*)                        # end
+					$close
+					($|[\]}]|(?=[[:punct:]]{1,2}|\s|\))) # tail
+				/x", array(&$this, "_FoundSpan"), $text);
+			}
+		}
+		$this->span_depth--;
+		return $text;
+	}
+
+
+	protected function _FoundSpan( $m )
+	{
+		$this->TriggerParseEvent( 'span:' . $this->current_span );
+		$handler = 'TextileOutputGenerator::'.$this->current_span.'_SpanHandler';
+		if( is_callable( $handler ) )
+			return call_user_func( $handler, $this->current_span, $m );
+		elseif('TextileOutputGenerator::default_SpanHandler')
+			return call_user_func( 'TextileOutputGenerator::default_SpanHandler' , $this->current_span, $m );
+		else
+			return $m[0];
+	}
 
 	protected function _ParseFootnoteRefs($text)
 	{
@@ -450,7 +571,7 @@ class Textile
 		# TODO: Trigger parse event
 		$name = "TextileOutputGenerator::$name";
 		if( !is_callable( $name ) ) {
-#echo "No output handler matching [$name] found.\n";
+      #echo "No output handler matching [$name] found.\n";
 		  return;
 		}
 
@@ -530,7 +651,6 @@ class Textile
 	}
 
 
-
 	/**
 	 * Sends parse event notifications to all registered listeners.
 	 */
@@ -545,6 +665,7 @@ class Textile
 			call_user_func( $listener, $args );
 		}
 	}
+
 
 	protected function HorizontalAlign($in)
 	{
