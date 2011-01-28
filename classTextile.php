@@ -440,7 +440,7 @@ class Textile
 	public function ParseSpans($text)	# Public to allow output generators to recursively span content. eg. for *_abc_* etc.
 	{
 		$spans = $this->spans->getData();
-		$pnct = ".,\"'?!;:";
+		$pnct = ".,\"'?!;:‹›«»„“”‚‘’";
 		$this->span_depth++;
 		static $subs = array( '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?', '/'=>'\/' );
 
