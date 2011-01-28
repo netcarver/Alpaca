@@ -64,6 +64,11 @@ class TextileSpanBag extends TextileDataBag
 
 	public function __get($name)
 	{
+		return $this->data[$name];
+	}
+
+	public function getData()
+	{
 		return $this->data;
 	}
 
@@ -92,6 +97,7 @@ class Textile
 	protected $restricted       = true;			# Textile runs in restricted mode unless invoked via 'TextileThis()'
 	protected $span_depth;
 	protected $max_span_depth;
+	protected $fragments				= array();	# Stores completed output fragments for latter stitching back together.
 
 	/**
 	 *
@@ -120,6 +126,9 @@ class Textile
 		 */
 		$this->spans = new TextileSpanBag();
 		$this->spans
+			->inlinetextile('==')
+			->addAsymmetricSpan('notextile', '<notextile>', '</notextile>')
+			->code('@')
 			->b('**')
 			->strong('*')
 			->cite('??')
@@ -412,7 +421,7 @@ class Textile
 #			$text = $this->lists($text);
 		}
 
-		$text = $this->_ParseSpans($text);
+		$text = $this->ParseSpans($text);
 		$text = $this->_ParseFootnoteRefs($text);
 #		$text = $this->noteRef($text);
 #		$text = $this->glyphs($text);
@@ -421,12 +430,12 @@ class Textile
 	}
 
 
-	protected function _ParseSpans($text)
+	public function ParseSpans($text)	# Public to allow output generators to recursively span content. eg. for *_abc_* etc.
 	{
-		$spans = $this->spans->data;
+		$spans = $this->spans->getData();
 		$pnct = ".,\"'?!;:";
 		$this->span_depth++;
-		static $subs = array( '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?' );
+		static $subs = array( '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?', '/'=>'\/' );
 
 		if( $this->span_depth <= $this->max_span_depth )
 		{
@@ -442,7 +451,7 @@ class Textile
 					(?::(\S+))?                       # cite
 					([^\s$close]+|\S.*?[^\s$close\n]) # content
 					([$pnct]*)                        # end
-					$close
+					($close)													# closetag
 					($|[\]}]|(?=[[:punct:]]{1,2}|\s|\))) # tail
 				/x", array(&$this, "_FoundSpan"), $text);
 			}
@@ -599,7 +608,13 @@ class Textile
 		#
 		#	Start parsing...
 		#
-		return $this->_ParseBlocks( $text );
+		$text = $this->_ParseBlocks( $text );
+
+		#
+		#	Replacement time...
+		#
+		$text = $this->RetrieveFragment($text);
+		return $text;
 	}
 
 

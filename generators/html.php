@@ -116,16 +116,44 @@ class TextileOutputGenerator
 	}
 
 
+
+	static public function verbatim_SpanHandler( $span, $m )
+	{
+		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
+#self::$parser->dump( __METHOD__." -- Called with [$span], matched [$tag/$closetag]." );
+
+		$content = self::$parser->ShelveFragment($atts.$content);
+		return $pre.$content.$tail;
+	}
+
+
+	static public function code_SpanHandler( $span, $m )
+	{
+		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
+//self::$parser->dump( __METHOD__." -- Called with [$span], matched [$tag/$closetag]." );
+
+		$content = self::$parser->ShelveFragment(self::$parser->ConditionallyEncodeHTML($atts.$content));
+
+		return "$pre<code>$content</code>$tail";
+	}
+
+
+	/**
+	 *	Default span handler -- in the case of HTML, the span name is the HTML tag to use to wrap the content.
+	 **/
 	static public function default_SpanHandler( $span, $m )
 	{
-		list(, $pre, $tag, $atts, $cite, $content, $end, $tail) = $m;
+		if( in_array($span, array('notextile','inlinetextile') ) )
+			return self::verbatim_SpanHandler($span, $m);
 
-#self::$parser->dump( "Called with [$span], matched [$tag] => span2[$span2]." );
+		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
+
+#self::$parser->dump( "Called with [$span], matched [$tag/$closetag]." );
 
 		$atts = self::$parser->ParseBlockAttributes($atts);
 		$atts .= ($cite != '') ? 'cite="' . $cite . '"' : '';
 
-//		$content = self::$parser->span($content);	# TODO Will need to do this to recursively parse a span.
+		$content = self::$parser->ParseSpans($content);	# TODO Will need to do this to recursively parse a span.
 
 		$opentag = '<'.$span.$atts.'>';
 		$closetag = '</'.$span.'>';
