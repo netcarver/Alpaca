@@ -2,11 +2,35 @@
 
 class TextileOutputGenerator
 {
-	static protected $parser = null;
+	static protected $parser  = null;
+	static protected $verbose = false;
 
+
+	/**
+	 *	Constructor.
+	 * Add your listeners and extension spans/blocks/glyphs in here...
+	 */
 	public function __construct( $parser )
 	{
-		self::$parser = $parser;
+		self::$parser  = $parser;
+		self::$verbose = false;			# change to true for more output.
+
+		self::$parser->AddParseListener( '*', 'TextileOutputGenerator::ParseListener');	# We want to know *everything*
+	}
+
+
+	# The following just provided as an illustration of listening to parse events. Not likely to be
+	# too useful in an output generator as they are being called back by the very events that this would
+	# listen to anyway. However, in the case of something like an Index or TOC generation textplug, this
+	# listen ability will be useful.
+	static public function ParseListener( $event )
+	{
+		if( self::$verbose ) 
+			self::$parser->dump( $event[0] );
+
+		# Extensions could build auxiliary structures, 
+		# (like a TOC by listening to block:h events) and later place them in the document with 
+		# a PostParseHandler.
 	}
 
 	static public function TidyLineBreaks( &$in )
@@ -16,11 +40,15 @@ class TextileOutputGenerator
 	}
 
 
+  # ===========================================================================
+	#
+	# Block handlers...
+	#
+  # ===========================================================================
 	static public function notextile_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
 		$content = self::$parser->ShelveFragment($content);
-		$o1 = $o2 = '';
-		$c1 = $c2 = '';
+		$o1 = $o2 = $c1 = $c2 = '';
 		return array($o1, $o2, $content, $c2, $c1, $eat);
 	}
 
@@ -48,6 +76,7 @@ class TextileOutputGenerator
 	}
 
 
+	# TODO move this one to a new textplug.
 	static public function hr_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
 		$o1 = "<hr$atts";
@@ -61,27 +90,8 @@ class TextileOutputGenerator
 			$content = self::$parser->ShelveFragment(self::$parser->ConditionallyEncodeHTML($content));
 		}
 		return array($o1, $o2, $content, $c2, $c1, $eat);
-	}
+	} 
 
-
-  static public function FootnoteIDHandler($id, $nolink, $t)
-	{
-		$backref = '';
-	
-		if( self::$parser->GetFootnoteID( $id ) === $id ) {
-		  $a = uniqid(rand());
-		  self::$parser->DefineFootnoteID( $id, $a );
-			$backref = 'id="fnrev'.$a.'" ';
-		}
-
-		$fnid = self::$parser->GetFootnoteID( $id );
-
-		$footref = ( '!' == $nolink ) ? $id : '<a href="#fn'.$fnid.'">'.$id.'</a>';
-		$footref = '<sup '.$backref.'class="footnote">'.$footref.'</sup>';
-
-		return $footref;
-	}
- 
 
 	static public function fn_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
@@ -110,13 +120,47 @@ class TextileOutputGenerator
 	}
 
 
-
-	static public function _BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
+	static public function default_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
+		#echo $content,"\n\n";
+		if( $tag === '###' ) 
+		  return array( '', '', '', '', '', true );
+
+    $o2 = "\t<$tag$atts>";
+		$c2 = "</$tag>";
+    return array($o1, $o2, $content, $c2, $c1, $eat);
 	}
 
 
+	# ===========================================================================
+	#
+	# Footnote ID handlers...
+	#
+  # ===========================================================================
+  static public function FootnoteIDHandler($id, $nolink, $t)
+	{
+		$backref = '';
+	
+		if( self::$parser->GetFootnoteID( $id ) === $id ) {
+		  $a = uniqid(rand());
+		  self::$parser->DefineFootnoteID( $id, $a );
+			$backref = 'id="fnrev'.$a.'" ';
+		}
 
+		$fnid = self::$parser->GetFootnoteID( $id );
+
+		$footref = ( '!' == $nolink ) ? $id : '<a href="#fn'.$fnid.'">'.$id.'</a>';
+		$footref = '<sup '.$backref.'class="footnote">'.$footref.'</sup>';
+
+		return $footref;
+	}
+
+
+  # ===========================================================================
+	#
+	# Span handlers...
+	#
+  # ===========================================================================
 	static public function verbatim_SpanHandler( $span, $m )
 	{
 		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
@@ -143,23 +187,20 @@ class TextileOutputGenerator
 	 **/
 	static public function default_SpanHandler( $span, $m )
 	{
+		# Fixme the following two lines are needed as I chose to implement the span container as a bag...
 		if( in_array($span, array('notextile','inlinetextile') ) )
 			return self::verbatim_SpanHandler($span, $m);
 
 		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
 
-#self::$parser->dump( "Called with [$span], matched [$tag/$closetag]." );
-
 		$atts = self::$parser->ParseBlockAttributes($atts);
 		$atts .= ($cite != '') ? 'cite="' . $cite . '"' : '';
-
-		$content = self::$parser->ParseSpans($content);	# TODO Will need to do this to recursively parse a span.
-
+		$content = self::$parser->ParseSpans($content);
 		$opentag = '<'.$span.$atts.'>';
 		$closetag = '</'.$span.'>';
 //		$tags = $this->storeTags($opentag, $closetag);	# TODO Will need to do this to allow glyphing around spans.
 //		$out = "{$tags['open']}{$content}{$end}{$tags['close']}";
-		$out = "$opentag{$content}{$end}$closetag"; # fixme temp output
+		$out = "$opentag{$content}{$end}$closetag"; # fixme this line is temp output -- remove when the two lines above are uncommented.
 
 		if (($pre and !$tail) or ($tail and !$pre))
 			$out = $pre.$out.$tail;
@@ -167,17 +208,6 @@ class TextileOutputGenerator
 		return $out;
 	}
 
-
-	static public function default_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
-	{
-#echo $content,"\n\n";
-		if( $tag === '###' ) 
-		  return array( '', '', '', '', '', true );
-
-    $o2 = "\t<$tag$atts>";
-		$c2 = "</$tag>";
-    return array($o1, $o2, $content, $c2, $c1, $eat);
-	}
 
 /*
 		if( $tag === 'p' ) {
@@ -200,3 +230,4 @@ class TextileOutputGenerator
 
 }
 
+#eof

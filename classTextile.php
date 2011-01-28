@@ -123,6 +123,7 @@ class Textile
 
 		/**
 		 *	By default, the standard textile spans are now *named* after the HTML tag that should be emmitted for them.
+		 * TODO decide if we should add multiple mappings to span names? (make it a set?) to allow notextile and inlintextile to map to the same (verbatim) handler.
 		 */
 		$this->spans = new TextileSpanBag();
 		$this->spans
@@ -424,9 +425,15 @@ class Textile
 		$text = $this->ParseSpans($text);
 		$text = $this->_ParseFootnoteRefs($text);
 #		$text = $this->noteRef($text);
-#		$text = $this->glyphs($text);
+		$text = $this->ParseGlyphs($text);
 
 		return rtrim($text, "\n");
+	}
+
+
+	public function ParseGlyphs($text)
+	{
+		return $text;
 	}
 
 
@@ -463,7 +470,7 @@ class Textile
 
 	protected function _FoundSpan( $m )
 	{
-		$this->TriggerParseEvent( 'span:' . $this->current_span );
+		$this->TriggerParseEvent( 'span:' . $this->current_span, $m );
 		$handler = 'TextileOutputGenerator::'.$this->current_span.'_SpanHandler';
 		if( is_callable( $handler ) )
 			return call_user_func( $handler, $this->current_span, $m );
@@ -672,12 +679,21 @@ class Textile
 	protected function TriggerParseEvent( $name )
 	{
 #$this->dump( __METHOD__."($name)");
-		if( empty( $this->parse_listeners[$name] ) )
-			return;
-
-		foreach( $this->parse_listeners[$name] as $listener ) {
-			$args = array_slice( func_get_args(), 1 );
-			call_user_func( $listener, $args );
+		$listeners = @$this->parse_listeners[$name];
+		if( !empty($listeners) ) {
+			foreach( $listeners as $listener ) {
+//			$args = array_slice( func_get_args(), 1 );
+  			$args = func_get_args();
+	  		call_user_func( $listener, $args );
+			}
+		}
+		$listeners = $this->parse_listeners['*'];
+		if( !empty($listeners) ) {
+			foreach( $listeners as $listener ) {
+//			$args = array_slice( func_get_args(), 1 );
+				$args = func_get_args();
+				call_user_func( $listener, $args );
+			}
 		}
 	}
 
