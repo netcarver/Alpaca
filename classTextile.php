@@ -606,7 +606,6 @@ class Textile extends TextileObject
 				}
 			}
 
-
 			$this->TryOutputHandler( 'TidyLineBreaks', $block );
 
 			if ($ext and $anon)

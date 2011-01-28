@@ -13,7 +13,7 @@ class TextileOutputGenerator
 	public function __construct( $parser )
 	{
 		self::$parser  = $parser;
-		self::$verbose = true;			# change to true for more output.
+		self::$verbose = false;			# change to true for more output.
 
 		self::$parser->AddParseListener( '*', 'TextileOutputGenerator::ParseListener');	# We want to know *everything*
 	}
