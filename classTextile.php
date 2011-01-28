@@ -20,6 +20,12 @@ abstract class TextileObject
 			throw new TextileProgrammerException($msg);
 	}
 
+	static public function validateExists($arg, $msg)
+	{
+		if(!isset($arg)) 
+			throw new TextileProgrammerException($msg);
+	}
+
 	/**
 	 * 
 	 */
@@ -41,7 +47,7 @@ abstract class TextileObject
  * Helper class allows function chaining to set data...
  * data_bag->name1(value1)->name2(value2);
  */
-class TextileDataBag
+class TextileDataBag extends TextileObject
 {
 	protected $data;
 
@@ -51,9 +57,11 @@ class TextileDataBag
 	public function __toString()              { return var_export($this->data, true); }
 	public function __call( $name, $args )
 	{
+		self::validateExists(@$args[0], "Please supply a value for member [$name].");
 		$this->data[$name] = $args[0]; # Unknown methods act as setters
 		return $this;	# Allow chaining for multiple calls.
 	}
+	public function dump($label) { if(is_string($label) && !empty($label)) parent::dump("=== Data for $label... ==="); parent::dump($this->data); return $this; }
 }
 
 /**
@@ -107,7 +115,7 @@ class TextileSpanSet extends TextileObject
 		}
 		return $key;
 	}
-	public function dump() { parent::dump($this); return $this; }
+	public function dump($label) { if(is_string($label) && !empty($label)) parent::dump("=== Data for $label... ==="); parent::dump($this->data); return $this; }
 }
 
 /**
@@ -152,7 +160,24 @@ class Textile extends TextileObject
 	{
 		$this->output_type = $type;
 
+		@define('txt_has_unicode', @preg_match('/\pL/u', 'a')); // Detect if Unicode is compiled into PCRE
+
 		$this->patterns = new TextileDataBag();
+		if( txt_has_unicode ) {
+			$this->patterns
+				->acr('\p{Lu}\p{Nd}')
+				->abr('\p{Lu}')
+				->nab('\p{Ll}')
+				->wrd('(?:\p{L}|\p{M}|\p{N}|\p{Pc})')
+				->mod('u');
+		} else {
+			$this->patterns
+				->acr('A-Z0-9')
+				->abr('A-Z')
+				->nab('a-z')
+				->wrd('\w')
+				->mod('');
+		}
 		$this->patterns
 			->hlgn("(?:\<(?!>)|(?<!<)\>|\<\>|\=|[()]+(?! ))")
 		  ->vlgn("[\-^~]")
@@ -161,10 +186,13 @@ class Textile extends TextileObject
 		  ->styl("(?:\{[^}\n]+\})")
 		  ->cspn("(?:\\\\\d+)")
 		  ->rspn("(?:\/\d+)")
-		  ->a   ("(?:{$this->patterns->hlgn}|{$this->patterns->vlgn})*")
-		  ->s   ("(?:{$this->patterns->cspn}|{$this->patterns->rspn})*")
-		  ->c   ("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge}|{$this->patterns->hlgn})*")
-		  ->lc  ("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge})*")
+		  ->a("(?:{$this->patterns->hlgn}|{$this->patterns->vlgn})*")
+		  ->s("(?:{$this->patterns->cspn}|{$this->patterns->rspn})*")
+		  ->c("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge}|{$this->patterns->hlgn})*")
+		  ->lc("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge})*")
+			->urlch('[\w"$\-_.+!*\'(),";\/?:@=&%#{}|\\^~\[\]`]')
+			->pnc('[[:punct:]]')
+			#->dump('patterns')
 			;
 
 		/**
@@ -186,6 +214,32 @@ class Textile extends TextileObject
 			->ins('+')
 			->sub('~')
 			->sup('^')
+			#->dump('spans')
+			;
+
+		$this->glyphs = new TextileDataBag();
+		$this->glyphs
+		  ->apostrophe('/('.$this->patterns->wrd.')\'('.$this->patterns->wrd.')/'.$this->patterns->mod)
+			->initapostrophe('/(\s)\'(\d+'.$this->patterns->wrd.'?)\b(?![.]?['.$this->patterns->wrd.']*?\')/'.$this->patterns->mod)
+			->singleclose('/(\S)\'(?=\s|'.$this->patterns->pnc.'|<|$)/')
+			->singleopen('/\'/')
+			->doubleclose('/(\S)\"(?=\s|'.$this->patterns->pnc.'|<|$)/')
+			->doubleopen('/"/')
+		  ->ellipsis('/([^.]?)\.{3}/')
+		  ->emdash('/(\s?)--(\s?)/')
+			->endash('/\s-(?:\s|$)/')
+			->dimension('/(\d+)( ?)x( ?)(?=\d+)/')
+			->trademark('/(\b ?|\s|^)[([]TM[])]/i')
+			->registered('/(\b ?|\s|^)[([]R[])]/i')
+			->copyright('/(\b ?|\s|^)[([]C[])]/i')
+			->degrees('/[([]o[])]/')
+			->plusminus('/[([]\+\/-[])]/')
+			->quarter('/[([]1\/4[])]/')
+			->half('/[([]1\/2[])]/')
+			->threequarters('/[([]3\/4[])]/')
+			->caps('/(?<=\s|^|[>(;-])(['.$this->patterns->abr.']{3,})(['.$this->patterns->nab.']*)(?=\s|'.$this->patterns->pnc.'|<|$)(?=[^">]*?(<|$))/'.$this->patterns->mod )
+			->abbr('/\b(['.$this->patterns->abr.']['.$this->patterns->acr.']{2,})\b(?:[(]([^)]*)[)])/'.$this->patterns->mod)
+			->dump('glyphs')
 			;
 
 		# Load the generator config...
