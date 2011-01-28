@@ -685,7 +685,6 @@ class Textile extends TextileObject
 
 	protected function _fBlock($m)
 	{
-//		extract($this->regex_snippets);
 		list(, $tag, $att, $ext, $cite, $content) = $m;
 		$atts = $this->ParseBlockAttributes($att);
 
@@ -713,18 +712,14 @@ class Textile extends TextileObject
 		# Otherwise try to pass controll to a standard output generator...
 		#
 		elseif( is_callable( "TextileOutputGenerator::{$roottag}_BlockHandler" ) ) {
-#$this->dump( "Calling {$roottag}_Handler($tag)" );
 			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( "TextileOutputGenerator::{$roottag}_BlockHandler", $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
 		}
 
+	  #
+		# Finally, pass control to the default output handler...
 		#
-	  # Finally, pass control to the default output handler...
-		else {
-#$this->dump( "Calling default_Handler($tag)" );
+		else 
 			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( 'TextileOutputGenerator::default_BlockHandler', $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
-		}
-
-//$this->dump( $content );
 
 		$content = (!$eat) ? $this->_ParseParagraph($content) : '';
 		return array($o1, $o2, $content, $c2, $c1, $eat);
@@ -736,19 +731,16 @@ class Textile extends TextileObject
 	 */
 	protected function TriggerParseEvent( $name )
 	{
-#$this->dump( __METHOD__."($name)");
 		$listeners = @$this->parse_listeners[$name];
 		if( !empty($listeners) ) {
 			foreach( $listeners as $listener ) {
-//			$args = array_slice( func_get_args(), 1 );
   			$args = func_get_args();
 	  		call_user_func( $listener, $args );
 			}
 		}
-		$listeners = $this->parse_listeners['*'];
+		$listeners = $this->parse_listeners['*'];	# Send the event to any 'global' event listeners...
 		if( !empty($listeners) ) {
 			foreach( $listeners as $listener ) {
-//			$args = array_slice( func_get_args(), 1 );
 				$args = func_get_args();
 				call_user_func( $listener, $args );
 			}
