@@ -278,13 +278,6 @@ class Textile extends TextileObject
 	 */
 	public function DefineSpan( $name, $openmarker, $closemarker = null )
 	{
-	/*
-		self::validateString($name,  'name');
-		if( !is_string($name) || empty($name) )
-			throw new TextileProgrammerException( 'Invalid span $name -- should be a non-empty string.' );
-		if( !is_string($openmarker) || empty($openmarker) )
-			throw new TextileProgrammerException( 'Invalid $openmarker given -- should be a non-empty string.' );
-	*/
 		if( null === $closemarker) 
 			$closemarker = $openmarker;
 		else {
@@ -448,6 +441,11 @@ class Textile extends TextileObject
 	}
 
 
+  # ===========================================================================
+	#
+	# Footnote ID interface.
+	#
+  # ===========================================================================
 	public function GetFootnoteID( $key_or_default )
 	{
 		$id = @$this->fn[$key_or_default];
@@ -489,6 +487,7 @@ class Textile extends TextileObject
 		$out = preg_replace("/^[ \t]*\n/m", "\n", $out);	# lines containing only whitespace
 		$out = preg_replace("/\n{3,}/", "\n\n", $out);	# 3 or more line ends
 		$out = preg_replace("/^\n*/", "", $out);		# leading blank lines
+		$out = strtr( $out, array( "\x00"=>'' ) );	# null bytes
 		return $out;
 	}
 
@@ -608,7 +607,7 @@ class Textile extends TextileObject
 			}
 
 
-			self::TryOutputHandler( 'TidyLineBreaks', $block );
+			$this->TryOutputHandler( 'TidyLineBreaks', $block );
 
 			if ($ext and $anon)
 				$out[count($out)-1] .= "\n".$block;
@@ -639,14 +638,12 @@ class Textile extends TextileObject
 	}
 
 
-	static protected function TryOutputHandler( $name, &$in )
+	protected function TryOutputHandler( $name, &$in )
 	{
-		# TODO: Trigger parse event
+		$this->TriggerParseEvent( $name, $in );
 		$name = "TextileOutputGenerator::$name";
-		if( !is_callable( $name ) ) {
-      #echo "No output handler matching [$name] found.\n";
+		if( !is_callable( $name ) )
 		  return;
-		}
 
 		call_user_func( $name, $in );
 	}
@@ -661,7 +658,9 @@ class Textile extends TextileObject
 		$this->rel        = $rel;
 		$this->restricted = false;
 
-		#
+		$this->TryOutputHandler( 'initials', $text );
+
+		# Do standard textile initialisation...
 		$text = $this->CleanWhiteSpace( $text );
 
 		#
@@ -678,6 +677,8 @@ class Textile extends TextileObject
 		#	Replacement time...
 		#
 		$text = $this->RetrieveFragment($text);
+
+		$this->TryOutputHandler( 'finals', $text );
 		return $text;
 	}
 

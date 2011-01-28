@@ -13,7 +13,7 @@ class TextileOutputGenerator
 	public function __construct( $parser )
 	{
 		self::$parser  = $parser;
-		self::$verbose = false;			# change to true for more output.
+		self::$verbose = true;			# change to true for more output.
 
 		self::$parser->AddParseListener( '*', 'TextileOutputGenerator::ParseListener');	# We want to know *everything*
 	}
@@ -29,8 +29,15 @@ class TextileOutputGenerator
   # ===========================================================================
 	static public function ParseListener( $event )
 	{
+		$parse_event = $event[0];
+		if( !in_array( $parse_event, array( 'initials', 'finals' ) ) )	# Indent non initials/finals events...
+			$parse_event = "\t$parse_event";
+
 		if( self::$verbose ) 
-			self::$parser->dump( $event[0] );
+			self::$parser->dump( $parse_event /*, $event[1]*/ );
+
+		if( $event[0] === 'finals' )	# limit debug to first full set (if verbose is on)
+			self::$verbose = false;
 
 		# Extensions could build auxiliary structures, 
 		# (like a TOC by listening to block:h events) and later place them in the document with 
