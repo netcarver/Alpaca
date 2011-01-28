@@ -8,6 +8,35 @@
 class TextileUnexpectedException extends Exception {}
 class TextileProgrammerException extends TextileUnexpectedException {}	# Thrown for incorrect setup which needs to fail early and loud.
 
+
+/**
+ *	Common base class with some common behaviour.
+ */
+abstract class TextileObject
+{
+	static public function validateString($s, $msg)	
+	{ 
+		if(!is_string($s) || empty($s)) 
+			throw new TextileProgrammerException($msg);
+	}
+
+	/**
+	 * 
+	 */
+  public function dump($html=true)
+	{
+	 	static $bool = array( 0=>'false', 1=>'true' );
+		foreach (func_get_args() as $a) {
+		  if( $html ) 
+				echo "\n<pre>", (is_array($a)) ? htmlspecialchars(var_export($a, true)) : ((is_bool($a)) ? $bool[(int)$a] : htmlspecialchars($a)), "</pre>\n";
+			else 
+				echo "\n", (is_array($a)) ? var_export($a,true) : ((is_bool($a)) ? $bool[(int)$a] : $a), "\n";
+		}
+		return $this;
+	}
+}
+
+
 /**
  * Helper class allows function chaining to set data...
  * data_bag->name1(value1)->name2(value2);
@@ -27,26 +56,48 @@ class TextileDataBag
 	}
 }
 
+/**
+ *	Simple class to represent spans.
+ * Spans may have symmetric open and close markers (as in textile's '*abc*') or
+ * asymmetric ones (like '<notextile>abc</notextile>')
+ */
+class TextileSpan
+{
+	protected $data;
+	
+	public function __construct( $name, $open, $close )
+	{
+		$this->data['name']  = $name;
+		$this->data['open']  = $open;
+		$this->data['close'] = $close;
+	}
+	public function __get($key)           { return $this->data[$key]; }
+	public function getKey($open,$close)  { if( ($open === $this->data['open']) && ($close === $this->data['close']) ) return $this->data['name']; else return false; }
+}
 
-class TextileSpanSet
+
+/**
+ *	Simple class to hold a set of Spans.
+ */
+class TextileSpanSet extends TextileObject
 {
 	protected $data;
 
 	public function __construct()             { $this->data = array(); }
-	public function __call($name, $args)      { return $this->addAsymmetricSpan( $name, $args[0], ( (isset($args[1]))? $args[1] : $args[0]) ); }
-	public function __get($name)              { return $this->data[$name]; }
+	public function __call($name, $args)      { return $this->addAsymmetricSpan( $name, @$args[0], ( (isset($args[1]))? $args[1] : @$args[0]) ); }
 	public function getData()                 { return $this->data; }
-
-# Adds a symmetric span (where open marker is the same as the close marker)
-  public function addSpan( $name, $marker ) { return $this->addAsymmetricSpan( $name, $marker, $marker ); }
 
 	public function addAsymmetricSpan( $name, $open, $close )
 	{
-		$this->data[] = array( 'name'=>(string)$name, 'open' => (string)$open, 'close' => (string)$close );
+		self::validateString($name,  'Invalid span $name -- must be non-empty string');
+		self::validateString($open,  'Invalid span $open -- must be non-empty string');
+		self::validateString($close, 'Invalid span $close -- must be non-empty string');
+
+		$this->data[] = new TextileSpan( $name, $open, $close );
 		return $this;
 	}
 
-	public function lookupSpanName($open,$close=null)
+	public function lookupSpanName($open,$close=null) # TODO fix this to work with span objects...
 	{
 		if( null === $close ) $close = $open;
 		$key = false;
@@ -56,10 +107,13 @@ class TextileSpanSet
 		}
 		return $key;
 	}
-	public function dump() { echo '<pre>',htmlspecialchars( var_export($this->data, true) ),"</pre>\n"; return $this; }
+	public function dump() { parent::dump($this); return $this; }
 }
 
-class TextileSetIterator implements Iterator
+/**
+ *	Iterator for spans -- uses a copy of the span set's data to iterate over as it's used in a recursive context.
+ */
+class TextileSpanIterator implements Iterator
 {
 	protected $position = 0;
 	protected $array;
@@ -76,7 +130,7 @@ class TextileSetIterator implements Iterator
 /**
  *
  */
-class Textile
+class Textile extends TextileObject
 {
 	protected $output_type      = null;
   protected $output_generator = null;
@@ -132,7 +186,6 @@ class Textile
 			->ins('+')
 			->sub('~')
 			->sup('^')
-			#->dump()
 			;
 
 		# Load the generator config...
@@ -145,7 +198,11 @@ class Textile
 	}
 
 
-	public function ParseSpans($text)	# Public to allow output generators to recursively span content. eg. for *_abc_* etc.
+	/**
+   *	Span parser.
+	 *  Public to allow output generators to recursively span content. eg. for *_abc_* etc.
+	 */
+	public function ParseSpans($text)	
 	{
 		$this->span_depth++;
 
@@ -158,13 +215,12 @@ class Textile
 
 		if( $this->span_depth <= $this->max_span_depth )
 		{
-		  $spans = new TextileSetIterator( $this->spans );
+		  $spans = new TextileSpanIterator( $this->spans ); 
 			foreach($spans as $span)
 			{
-				$open  = strtr( $span['open'],  $subs );
-				$close = strtr( $span['close'], $subs );
-				$this->current_span = $span['name'];
-
+				$open  = strtr( $span->open,  $subs );
+				$close = strtr( $span->close, $subs );
+				$this->current_span = $span->name;
 				$text = preg_replace_callback("/
 					(^|(?<=[\s>$pnct\(])|[{[])        # pre
 					($open)(?!$open)                  # tag
@@ -222,10 +278,13 @@ class Textile
 	 */
 	public function DefineSpan( $name, $openmarker, $closemarker = null )
 	{
+	/*
+		self::validateString($name,  'name');
 		if( !is_string($name) || empty($name) )
 			throw new TextileProgrammerException( 'Invalid span $name -- should be a non-empty string.' );
 		if( !is_string($openmarker) || empty($openmarker) )
 			throw new TextileProgrammerException( 'Invalid $openmarker given -- should be a non-empty string.' );
+	*/
 		if( null === $closemarker) 
 			$closemarker = $openmarker;
 		else {
@@ -706,17 +765,6 @@ class Textile
 		return (isset($vals[$in])) ? $vals[$in] : '';
 	}
 
-
-	/**
-	 * 
-	 */
-  public function dump()
-	{
-	 	static $bool = array( 0=>'false', 1=>'true' );
-		foreach (func_get_args() as $a)
-			echo (($this->output_type!='text')? "\n<pre>" : ''),(is_array($a)) ? print_r($a) : ((is_bool($a)) ? $bool[(int)$a] : $a), (($this->output_type!='text')? "\n</pre>" : ''), "\n";
-		return $this;
-	}
 
 }
 
