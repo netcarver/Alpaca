@@ -16,68 +16,60 @@ class TextileDataBag
 {
 	protected $data;
 
-	public function __construct()
-	{
-		$this->data = array();
-	}
-
-	public function __get( $name )
-	{
-		$tmp = @$this->data[$name];
-		return (string)$tmp;
-	}
-
-	public function __set( $name, $value )
-	{
-		$this->data[$name] = $value;
-	}
-	
+	public function __construct()             { $this->data = array(); }
+	public function __get( $name )          	{ return (string)@$this->data[$name]; }
+	public function __set( $name, $value )   	{ $this->data[$name] = $value; }
+	public function __toString()              { return var_export($this->data, true); }
 	public function __call( $name, $args )
 	{
 		$this->data[$name] = $args[0]; # Unknown methods act as setters
 		return $this;	# Allow chaining for multiple calls.
 	}
-
-	public function __toString()
-	{
-		return var_export($this->data, true);
-	}
 }
 
-class TextileSpanBag extends TextileDataBag
+
+class TextileSpanSet
 {
-  public function addSpan( $name, $marker )  # Adds a symmetric span (where open marker is the same as the close marker)
-	{
-		return $this->addAsymmetricSpan( $name, $marker, $marker );
-	}
+	protected $data;
 
-	public function addAsymmetricSpan( $name, $openmark, $closemark )
+	public function __construct()             { $this->data = array(); }
+	public function __call($name, $args)      { return $this->addAsymmetricSpan( $name, $args[0], ( (isset($args[1]))? $args[1] : $args[0]) ); }
+	public function __get($name)              { return $this->data[$name]; }
+	public function getData()                 { return $this->data; }
+
+# Adds a symmetric span (where open marker is the same as the close marker)
+  public function addSpan( $name, $marker ) { return $this->addAsymmetricSpan( $name, $marker, $marker ); }
+
+	public function addAsymmetricSpan( $name, $open, $close )
 	{
-		$this->data[$name] = array( 'open' => $openmark, 'close' => $closemark );
+		$this->data[] = array( 'name'=>(string)$name, 'open' => (string)$open, 'close' => (string)$close );
 		return $this;
-	}
-
-	public function __call($name, $value)
-	{
-	  return $this->addAsymmetricSpan( $name, $value[0], $value[0] );
-	}
-
-	public function __get($name)
-	{
-		return $this->data[$name];
-	}
-
-	public function getData()
-	{
-		return $this->data;
 	}
 
 	public function lookupSpanName($open,$close=null)
 	{
 		if( null === $close ) $close = $open;
-		$needle = array('open'=>$open, 'close'=>$close);
-		return array_search( $needle , $this->data );
+		$key = false;
+		foreach( $this->data as $entry ) {
+			if( ($entry['open'] == $open) && ($entry['close'] == $close) )
+				return $entry['name'];
+		}
+		return $key;
 	}
+	public function dump() { echo '<pre>',htmlspecialchars( var_export($this->data, true) ),"</pre>\n"; return $this; }
+}
+
+class TextileSetIterator implements Iterator
+{
+	protected $position = 0;
+	protected $array;
+
+	public function __construct( TextileSpanSet &$set ) { $this->array = $set->getData(); }
+	public function rewind()    { $this->position = 0; }
+	public function current()   { return $this->array[$this->position]; }
+	public function key()       { return $this->position; }
+	public function next()      { ++$this->position; }
+	public function valid()     { return isset($this->array[$this->position]); }
 }
 
 
@@ -123,13 +115,13 @@ class Textile
 
 		/**
 		 *	By default, the standard textile spans are now *named* after the HTML tag that should be emmitted for them.
-		 * TODO decide if we should add multiple mappings to span names? (make it a set?) to allow notextile and inlintextile to map to the same (verbatim) handler.
 		 */
-		$this->spans = new TextileSpanBag();
-		$this->spans
-			->inlinetextile('==')
-			->addAsymmetricSpan('notextile', '<notextile>', '</notextile>')
+		$this->spans = new TextileSpanSet();
+		$this->spans	# TODO make sure each of these spans is covered in the test cases.
+			->verbatim('==')
+			->verbatim('<notextile>', '</notextile>')
 			->code('@')
+			->code('<code>','</code>')
 			->b('**')
 			->strong('*')
 			->cite('??')
@@ -140,9 +132,8 @@ class Textile
 			->ins('+')
 			->sub('~')
 			->sup('^')
+			#->dump()
 			;
-
-#$this->dump( $this->patterns );
 
 		# Load the generator config...
 		$generator = "./generators/$type.php";	# TODO allow location to be redefined.
@@ -152,6 +143,44 @@ class Textile
 		$this->span_depth = 0;
 		$this->max_span_depth = 5;	# TODO make this configurable
 	}
+
+
+	public function ParseSpans($text)	# Public to allow output generators to recursively span content. eg. for *_abc_* etc.
+	{
+		$this->span_depth++;
+
+		static $subs = null;
+		static $pnct = null;
+		if( null === $subs ) {
+		  $pnct = ".,\"'?!;:‹›«»„“”‚‘’";
+			$subs = array( '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?', '/'=>'\/', '['=>'\[', ']'=>'\]', '('=>'\(', ')'=>'\)', '{'=>'\{', '}'=>'\}' );
+		}
+
+		if( $this->span_depth <= $this->max_span_depth )
+		{
+		  $spans = new TextileSetIterator( $this->spans );
+			foreach($spans as $span)
+			{
+				$open  = strtr( $span['open'],  $subs );
+				$close = strtr( $span['close'], $subs );
+				$this->current_span = $span['name'];
+
+				$text = preg_replace_callback("/
+					(^|(?<=[\s>$pnct\(])|[{[])        # pre
+					($open)(?!$open)                  # tag
+					({$this->patterns->c})            # atts
+					(?::(\S+))?                       # cite
+					([^\s$close]+|\S.*?[^\s$close\n]) # content
+					([$pnct]*)                        # end
+					($close)													# closetag
+					($|[\]}]|(?=[[:punct:]]{1,2}|\s|\))) # tail
+				/x", array(&$this, "_FoundSpan"), $text);
+			}
+		}
+		$this->span_depth--;
+		return $text;
+	}
+
 
 
   /**
@@ -433,37 +462,6 @@ class Textile
 
 	public function ParseGlyphs($text)
 	{
-		return $text;
-	}
-
-
-	public function ParseSpans($text)	# Public to allow output generators to recursively span content. eg. for *_abc_* etc.
-	{
-		$spans = $this->spans->getData();
-		$pnct = ".,\"'?!;:‹›«»„“”‚‘’";
-		$this->span_depth++;
-		static $subs = array( '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?', '/'=>'\/' );
-
-		if( $this->span_depth <= $this->max_span_depth )
-		{
-			foreach($spans as $span=>$markers)
-			{
-				$open  = strtr( $markers['open'],  $subs );
-				$close = strtr( $markers['close'], $subs );
-				$this->current_span = $span;
-				$text = preg_replace_callback("/
-					(^|(?<=[\s>$pnct\(])|[{[])        # pre
-					($open)(?!$open)                  # tag
-					({$this->patterns->c})            # atts
-					(?::(\S+))?                       # cite
-					([^\s$close]+|\S.*?[^\s$close\n]) # content
-					([$pnct]*)                        # end
-					($close)													# closetag
-					($|[\]}]|(?=[[:punct:]]{1,2}|\s|\))) # tail
-				/x", array(&$this, "_FoundSpan"), $text);
-			}
-		}
-		$this->span_depth--;
 		return $text;
 	}
 

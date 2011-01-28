@@ -19,10 +19,14 @@ class TextileOutputGenerator
 	}
 
 
+  # ===========================================================================
+	#
 	# The following just provided as an illustration of listening to parse events. Not likely to be
 	# too useful in an output generator as they are being called back by the very events that this would
 	# listen to anyway. However, in the case of something like an Index or TOC generation textplug, this
 	# listen ability will be useful.
+	# 
+  # ===========================================================================
 	static public function ParseListener( $event )
 	{
 		if( self::$verbose ) 
