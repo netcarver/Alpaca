@@ -183,6 +183,8 @@ class Textile extends TextileObject
 	protected $span_depth;
 	protected $max_span_depth;
 	protected $fragments				= array();	# Stores completed output fragments for latter stitching back together.
+	protected $hu;
+	protected $url_schemes;
 
 	/**
 	 *
@@ -190,6 +192,8 @@ class Textile extends TextileObject
 	public function __construct( $type = 'html' )
 	{
 		$this->output_type = $type;
+		$this->hu = (defined('hu')) ? hu : '';
+		$this->url_schemes = array('http','https','ftp','mailto');
 
 		@define('txt_has_unicode', @preg_match('/\pL/u', 'a')); // Detect if Unicode is compiled into PCRE
 
@@ -509,7 +513,11 @@ class Textile extends TextileObject
 	}
 
 
-
+  # ===========================================================================
+	#
+	# Storage of parsed fragments / glyphs / urls / tags
+	#
+	# ===========================================================================
 	/**
 	 * Stores a fragment verbatim for later pasting back into the output. Prevents any handlers from further
 	 * transforming it.
@@ -562,6 +570,50 @@ class Textile extends TextileObject
 	{
 		list(, $key ) = $m;
 		return $this->tagCache[$key]['close'];
+	}
+
+	public function ShelveURL($text)
+	{
+		if ('' === $text) return '';
+		$ref = md5($text);
+		$this->urlshelf[$ref] = $text;	# Unify the shelving mechanism for different types of fragment?
+		return 'urlref:'.$ref;
+	}
+
+	public function RetrieveURLs($text)
+	{
+		return preg_replace_callback('/urlref:(\w{32})/',
+			array(&$this, "retrieveURL"), $text);
+	}
+
+	public function retrieveURL($m)
+	{
+		$ref = $m[1];
+		if (!isset($this->urlshelf[$ref]))
+			return $ref;
+		$url = $this->urlshelf[$ref];
+		if (isset($this->urlrefs[$url]))
+			$url = $this->urlrefs[$url];
+		return $this->ConditionallyEncodeHTML($this->relURL($url));
+	}
+
+	public function relURL($url)
+	{
+		$parts = @parse_url(urldecode($url));
+		if ((empty($parts['scheme']) or @$parts['scheme'] == 'http') and
+			 empty($parts['host']) and
+			 preg_match('/^\w/', @$parts['path']))
+			$url = $this->hu.$url;
+		if ($this->restricted and !empty($parts['scheme']) and
+				!in_array($parts['scheme'], $this->url_schemes))
+			return '#';
+		return $url;
+	}
+
+	function isRelURL($url)
+	{
+		$parts = @parse_url($url);
+		return (empty($parts['scheme']) and empty($parts['host']));
 	}
 
 
@@ -624,7 +676,7 @@ class Textile extends TextileObject
 		}
 
 #		$text = $this->getRefs($text);
-#		$text = $this->links($text);
+		$text = $this->_ParseLinks($text);
 #		if (!$this->noimage)
 #			$text = $this->image($text);
 
@@ -639,6 +691,32 @@ class Textile extends TextileObject
 		$text = $this->ParseGlyphs($text);
 
 		return rtrim($text, "\n");
+	}
+
+	protected function _ParseLinks($text)
+	{
+		return preg_replace_callback('/
+			(^|(?<=[\s>.\(])|[{[]) # $pre
+			"                      # start
+			(' . $this->patterns->c . ')     # $atts
+			([^"]+?)               # $text
+			(?:\(([^)]+?)\)(?="))? # $title
+			":
+			('.$this->patterns->urlch.'+?)   # $url
+			(\/)?                  # $slash
+			([^\w\/;]*?)           # $post
+			([\]}]|(?=\s|$|\)))
+		/x', array(&$this, "_FoundLink"), $text);
+	}
+
+
+	public function _FoundLink( &$m)
+	{
+		$this->TriggerParseEvent( 'link:link', $m );
+		$out = $this->TryOutputHandler('LinkHandler', $m);
+		if( false === $out )
+		  $out = $m[0];
+		return $out;
 	}
 
 
@@ -806,9 +884,9 @@ class Textile extends TextileObject
 		$this->TriggerParseEvent( $name, $in );
 		$name = "TextileOutputGenerator::$name";
 		if( !is_callable( $name ) )
-		  return;
+		  return false;
 
-		call_user_func( $name, $in );
+		return call_user_func( $name, $in );
 	}
 
 
@@ -833,7 +911,7 @@ class Textile extends TextileObject
 		}
 
 		# Do standard textile initialisation...
-		$this->TryOutputHandler( 'global:initials', $text );
+		$this->TryOutputHandler( 'Initials', $text );
 
 		if( !$strict )
 			$text = $this->CleanWhiteSpace( $text );
@@ -856,10 +934,11 @@ class Textile extends TextileObject
 		$text = $this->RetrieveFragment($text);
 		$text = preg_replace('/glyph:([^<]+)/','$1',$text);	# Replace the glyph marker -- this was added for 2.2 to allow caps spans in table cells. Might be better to fix the table stuff!
 		$text = $this->retrieveTags($text);
+		$text = $this->RetrieveURLs($text);
 
 		$this->span_depth = 0;
 
-		$this->TryOutputHandler( 'global:finals', $text );
+		$this->TryOutputHandler( 'Finals', $text );
 
 		return $text;
 	}
