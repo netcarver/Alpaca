@@ -3,19 +3,47 @@
 class TextileOutputGenerator
 {
 	static protected $parser  = null;
-	static protected $verbose = false;
+	static protected $glyphs;
+	static protected $verbose;
 
 
 	/**
 	 *	Constructor.
 	 * Add your listeners and extension spans/blocks/glyphs in here...
 	 */
-	public function __construct( $parser )
+	public function __construct( Textile &$parser )
 	{
-		self::$parser  = $parser;
+		self::$parser  = $parser;		# TODO validate $parser is textile object
 		self::$verbose = false;			# change to true for more output.
 
+		self::$glyphs  = new TextileDataBag('Glyph replacement patterns');
+		self::$glyphs
+		  ->apostrophe('$1'.txt_apostrophe.'$2')
+			->initapostrophe('$1'.txt_apostrophe.'$2')
+			->singleclose('$1'.txt_quote_single_close)
+			->singleopen(txt_quote_single_open)
+			->doubleclose('$1'.txt_quote_double_close)
+			->doubleopen(txt_quote_double_open)
+		  ->ellipsis('$1'.txt_ellipsis)
+		  ->emdash('$1'.txt_emdash.'$2')
+			->endash(' '.txt_endash.' ')
+			->dimension('$1$2'.txt_dimension.'$3')
+			->trademark('$1'.txt_trademark)
+			->registered('$1'.txt_registered)
+			->copyright('$1'.txt_copyright)
+			->degrees(txt_degrees)
+			->plusminus(txt_plusminus)
+			->quarter(txt_quarter)
+			->half(txt_half)
+			->threequarters(txt_threequarters)
+			->caps('<span class="caps">glyph:$1</span>$2')
+			->abbr('<acronym title="$2">$1</acronym>')
+			#->dump()
+			;
+
 		self::$parser->AddParseListener( '*', 'TextileOutputGenerator::ParseListener');	# We want to know *everything*
+
+#		self::$parser->DefineGlyph('smiley', '@:-)@');
 	}
 
 
@@ -30,13 +58,18 @@ class TextileOutputGenerator
 	static public function ParseListener( $event )
 	{
 		$parse_event = $event[0];
-		if( !in_array( $parse_event, array( 'initials', 'finals' ) ) )	# Indent non initials/finals events...
-			$parse_event = "\t$parse_event";
+		if( !in_array( $parse_event, array( 'global:initials', 'global:finals' ) ) )    # Indent non initials/finals events...
+			$parse_label = "\t$parse_event";
 
-		if( self::$verbose ) 
-			self::$parser->dump( $parse_event /*, $event[1]*/ );
+		$parts = explode( ':', $parse_event );
+		if( $parts[0] === 'glyph' ) {
 
-		if( $event[0] === 'finals' )	# limit debug to first full set (if verbose is on)
+			if( self::$verbose ) 
+				self::$parser->dump( $parse_label, $event[1] );
+
+		}
+
+		if( $parse_event === 'global:finals' )	# limit debug to first full set (if verbose is on)
 			self::$verbose = false;
 
 		# Extensions could build auxiliary structures, 
@@ -46,10 +79,19 @@ class TextileOutputGenerator
 
 	static public function TidyLineBreaks( &$in )
 	{
-//		$block = self::$parser->doPBr($block);
-		$in = preg_replace('/<br>/', '<br />', $in);	# TODO: Speed this up -- No need for preg_ here.
+		$in = preg_replace_callback('@<(p)([^>]*?)>(.*)(</\1>)@s', 'TextileOutputGenerator::InsertLooseParaBreaks', $in);
+		$in = preg_replace('/<br>/', '<br />', $in);	# TODO: Speed this up -- No need for preg_ here -- in fact, any need to do this at all?
 	}
 
+	static public function InsertLooseParaBreaks($m)
+	{
+		# Less restrictive version of fBr() ... used only in paragraphs where the next
+		# row may start with a smiley or perhaps something like '#8 bolt...' or '*** stars...'
+		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![\s|])@", '$1<br />', $m[3]);
+		$out = '<'.$m[1].$m[2].'>'.$content.$m[4];
+//self::$parser->dump(__METHOD__, $m, $out);
+	  return $out;
+	}
 
   # ===========================================================================
 	#
@@ -169,6 +211,24 @@ class TextileOutputGenerator
 
   # ===========================================================================
 	#
+	# Glyph handlers...
+	#
+  # ===========================================================================
+	static public function default_GlyphHandler( $glyph, &$m )
+	{
+		$out = self::$glyphs->get($glyph);
+#self::$parser->dump( "Handling glyph[$glyph] -> [$out].", $m);
+		if( !isset($out) )
+			return $m[0];
+		
+		$out = strtr( $out, array( '$1'=>@$m[1], '$2'=>@$m[2], '$3'=>@$m[3] ) );
+
+		return $out;
+	}
+
+
+  # ===========================================================================
+	#
 	# Span handlers...
 	#
   # ===========================================================================
@@ -198,10 +258,6 @@ class TextileOutputGenerator
 	 **/
 	static public function default_SpanHandler( $span, $m )
 	{
-		# Fixme the following two lines are needed as I chose to implement the span container as a bag...
-		if( in_array($span, array('notextile','inlinetextile') ) )
-			return self::verbatim_SpanHandler($span, $m);
-
 		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
 
 		$atts = self::$parser->ParseBlockAttributes($atts);
@@ -209,9 +265,8 @@ class TextileOutputGenerator
 		$content = self::$parser->ParseSpans($content);
 		$opentag = '<'.$span.$atts.'>';
 		$closetag = '</'.$span.'>';
-//		$tags = $this->storeTags($opentag, $closetag);	# TODO Will need to do this to allow glyphing around spans.
-//		$out = "{$tags['open']}{$content}{$end}{$tags['close']}";
-		$out = "$opentag{$content}{$end}$closetag"; # fixme this line is temp output -- remove when the two lines above are uncommented.
+		$tags = self::$parser->storeTags($opentag, $closetag);	
+		$out = "{$tags['open']}{$content}{$end}{$tags['close']}";
 
 		if (($pre and !$tail) or ($tail and !$pre))
 			$out = $pre.$out.$tail;
