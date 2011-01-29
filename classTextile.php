@@ -663,7 +663,7 @@ class Textile extends TextileObject
 		$out = preg_replace("/^[ \t]*\n/m", "\n", $out);	# lines containing only whitespace
 		$out = preg_replace("/\n{3,}/", "\n\n", $out);	# 3 or more line ends
 		$out = preg_replace("/^\n*/", "", $out);		# leading blank lines
-		$out = strtr( $out, array( "\x00"=>'' ) );	# null bytes
+//		$out = strtr( $out, array( "\x00"=>'' ) );	# null bytes
 		return $out;
 	}
 
@@ -712,7 +712,7 @@ class Textile extends TextileObject
 
 	public function _FoundLink( &$m)
 	{
-		$this->TriggerParseEvent( 'link:link', $m );
+		$this->TriggerParseEvent( 'link:link', $m );	# TODO triggering a parse event happens from TryOutputHandler too! Could lead to double event triggers on single events.
 		$out = $this->TryOutputHandler('LinkHandler', $m);
 		if( false === $out )
 		  $out = $m[0];
@@ -788,7 +788,7 @@ class Textile extends TextileObject
 	}
 	protected function _FootnoteRefFound($id, $nolink, $t)
 	{
-		$this->TriggerParseEvent( 'graf:fnref' , $id , $nolink, $t );
+		$this->TriggerParseEvent( 'graf:fnref' , $id , $nolink, $t );	
 #		if( is_callable( TextileOutputGenerator::FootnoteIDHandler( $id, $nolink, $t ) ) )
 			return call_user_func( 'TextileOutputGenerator::FootnoteIDHandler', $id, $nolink, $t );
 #		return $t;
@@ -881,7 +881,7 @@ class Textile extends TextileObject
 
 	protected function TryOutputHandler( $name, &$in )
 	{
-		$this->TriggerParseEvent( $name, $in );
+		$this->TriggerParseEvent( $name, $in ); # TODO Should this be triggering parse events? Perhaps better to do that explicitly from the point this is called.
 		$name = "TextileOutputGenerator::$name";
 		if( !is_callable( $name ) )
 		  return false;
