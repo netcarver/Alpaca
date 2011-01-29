@@ -247,11 +247,11 @@ class TextileOutputGenerator
 
 		$text = self::$parser->ParseSpans($text);	
 		$text = self::$parser->ParseGlyphs($text);	
-#		$url = $this->shelveURL($url.$slash); # Need to work on the fragment storage -- can URLs be shelved the same way?
+		$url  = self::$parser->ShelveURL($url.$slash); # Need to work on the fragment storage -- can URLs be shelved the same way?
 
 		$opentag = '<a href="' . $url . '"' . $atts . self::$parser->rel . '>';
 		$closetag = '</a>';
-		$tags = self::$parser->storeTags($opentag, $closetag);
+		$tags = self::$parser->StoreTags($opentag, $closetag);
 		$out = $tags['open'].trim($text).$tags['close'];
 
 		if (($pre and !$tail) or ($tail and !$pre))
@@ -303,7 +303,7 @@ class TextileOutputGenerator
 		$content = self::$parser->ParseSpans($content);
 		$opentag = '<'.$span.$atts.'>';
 		$closetag = '</'.$span.'>';
-		$tags = self::$parser->storeTags($opentag, $closetag);	# FIXME storeTags not UCC.
+		$tags = self::$parser->StoreTags($opentag, $closetag);	# FIXME StoreTags not UCC.
 		$out = "{$tags['open']}{$content}{$end}{$tags['close']}";
 
 		if (($pre and !$tail) or ($tail and !$pre))
