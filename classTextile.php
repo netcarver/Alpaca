@@ -1,5 +1,24 @@
 <?php
 
+@define('txt_quote_single_open',  '&#8216;');
+@define('txt_quote_single_close', '&#8217;');
+@define('txt_quote_double_open',  '&#8220;');
+@define('txt_quote_double_close', '&#8221;');
+@define('txt_apostrophe',         '&#8217;');
+@define('txt_prime',              '&#8242;');
+@define('txt_prime_double',       '&#8243;');
+@define('txt_ellipsis',           '&#8230;');
+@define('txt_emdash',             '&#8212;');
+@define('txt_endash',             '&#8211;');
+@define('txt_dimension',          '&#215;');
+@define('txt_trademark',          '&#8482;');
+@define('txt_registered',         '&#174;');
+@define('txt_copyright',          '&#169;');
+@define('txt_half',               '&#189;');
+@define('txt_quarter',            '&#188;');
+@define('txt_threequarters',      '&#190;');
+@define('txt_degrees',            '&#176;');
+@define('txt_plusminus',          '&#177;');
 
 /**
  * Exceptions.
@@ -14,17 +33,30 @@ class TextileProgrammerException extends TextileUnexpectedException {}	# Thrown 
  */
 abstract class TextileObject
 {
-	static public function validateString($s, $msg)	
+	static protected function validateString($s, $msg)	
 	{ 
 		if(!is_string($s) || empty($s)) 
+			throw new TextileProgrammerException($msg);
+	}
+
+	static protected function validateExists($arg, $msg)
+	{
+		if(!isset($arg)) 
+			throw new TextileProgrammerException($msg);
+	}
+
+	static protected function validateCallable($function, $msg)
+	{
+		if( !is_callable($function) )
 			throw new TextileProgrammerException($msg);
 	}
 
 	/**
 	 * 
 	 */
-  public function dump($html=true)
+  public function dump()
 	{
+		$html = true;
 	 	static $bool = array( 0=>'false', 1=>'true' );
 		foreach (func_get_args() as $a) {
 		  if( $html ) 
@@ -41,19 +73,26 @@ abstract class TextileObject
  * Helper class allows function chaining to set data...
  * data_bag->name1(value1)->name2(value2);
  */
-class TextileDataBag
+class TextileDataBag extends TextileObject
 {
 	protected $data;
+	protected $container_name;
 
-	public function __construct()             { $this->data = array(); }
+	public function __construct($name)        { self::validateString($name, "Container must be named."); $this->container_name = $name; $this->data = array(); }
 	public function __get( $name )          	{ return (string)@$this->data[$name]; }
-	public function __set( $name, $value )   	{ $this->data[$name] = $value; }
+	public function __set( $name, $value )   	{ $this->data[$name] = $value; return $this; }
+	public function add( $name, $value )      { $this->data[$name] = $value; return $this; }
+	public function remove($name)             { unset($this->data[$name]); return $this; }
+	public function getData()                 { return $this->data; }
+	public function get($name)                { return (string)@$this->data[$name]; }
 	public function __toString()              { return var_export($this->data, true); }
 	public function __call( $name, $args )
 	{
+		self::validateExists(@$args[0], "Please supply a value for member [$name].");
 		$this->data[$name] = $args[0]; # Unknown methods act as setters
 		return $this;	# Allow chaining for multiple calls.
 	}
+	public function dump() { parent::dump("=== Data for $this->container_name... ==="); parent::dump($this->data); return $this; }
 }
 
 /**
@@ -107,7 +146,7 @@ class TextileSpanSet extends TextileObject
 		}
 		return $key;
 	}
-	public function dump() { parent::dump($this); return $this; }
+	public function dump($label) { if(is_string($label) && !empty($label)) parent::dump("=== Data for $label... ==="); parent::dump($this->data); return $this; }
 }
 
 /**
@@ -152,7 +191,24 @@ class Textile extends TextileObject
 	{
 		$this->output_type = $type;
 
-		$this->patterns = new TextileDataBag();
+		@define('txt_has_unicode', @preg_match('/\pL/u', 'a')); // Detect if Unicode is compiled into PCRE
+
+		$this->patterns = new TextileDataBag('General regex patterns');
+		if( txt_has_unicode ) {
+			$this->patterns
+				->acr('\p{Lu}\p{Nd}')
+				->abr('\p{Lu}')
+				->nab('\p{Ll}')
+				->wrd('(?:\p{L}|\p{M}|\p{N}|\p{Pc})')
+				->mod('u');
+		} else {
+			$this->patterns
+				->acr('A-Z0-9')
+				->abr('A-Z')
+				->nab('a-z')
+				->wrd('\w')
+				->mod('');
+		}
 		$this->patterns
 			->hlgn("(?:\<(?!>)|(?<!<)\>|\<\>|\=|[()]+(?! ))")
 		  ->vlgn("[\-^~]")
@@ -161,10 +217,13 @@ class Textile extends TextileObject
 		  ->styl("(?:\{[^}\n]+\})")
 		  ->cspn("(?:\\\\\d+)")
 		  ->rspn("(?:\/\d+)")
-		  ->a   ("(?:{$this->patterns->hlgn}|{$this->patterns->vlgn})*")
-		  ->s   ("(?:{$this->patterns->cspn}|{$this->patterns->rspn})*")
-		  ->c   ("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge}|{$this->patterns->hlgn})*")
-		  ->lc  ("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge})*")
+		  ->a("(?:{$this->patterns->hlgn}|{$this->patterns->vlgn})*")
+		  ->s("(?:{$this->patterns->cspn}|{$this->patterns->rspn})*")
+		  ->c("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge}|{$this->patterns->hlgn})*")
+		  ->lc("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge})*")
+			->urlch('[\w"$\-_.+!*\'(),";\/?:@=&%#{}|\\^~\[\]`]')
+			->pnc('[[:punct:]]')
+			#->dump()
 			;
 
 		/**
@@ -186,6 +245,31 @@ class Textile extends TextileObject
 			->ins('+')
 			->sub('~')
 			->sup('^')
+			#->dump('spans')
+			;
+
+		$this->glyphs = new TextileDataBag('Glyph match patterns');
+		$this->glyphs
+		  ->apostrophe('/('.$this->patterns->wrd.')\'('.$this->patterns->wrd.')/'.$this->patterns->mod)
+			->initapostrophe('/(\s)\'(\d+'.$this->patterns->wrd.'?)\b(?![.]?['.$this->patterns->wrd.']*?\')/'.$this->patterns->mod)
+			->singleclose('/(\S)\'(?=\s|'.$this->patterns->pnc.'|<|$)/')
+			->singleopen('/\'/')
+			->doubleclose('/(\S)\"(?=\s|'.$this->patterns->pnc.'|<|$)/')
+			->doubleopen('/"/')
+			->abbr('/\b(['.$this->patterns->abr.']['.$this->patterns->acr.']{2,})\b(?:[(]([^)]*)[)])/'.$this->patterns->mod)
+			->caps('/(?<=\s|^|[>(;-])(['.$this->patterns->abr.']{3,})(['.$this->patterns->nab.']*)(?=\s|'.$this->patterns->pnc.'|<|$)(?=[^">]*?(<|$))/'.$this->patterns->mod )
+		  ->ellipsis('/([^.]?)\.{3}/')
+		  ->emdash('/(\s?)--(\s?)/')
+			->endash('/\s-(?:\s|$)/')
+			->dimension('/(\d+)( ?)x( ?)(?=\d+)/')
+			->trademark('/(\b ?|\s|^)[([]TM[])]/i')
+			->registered('/(\b ?|\s|^)[([]R[])]/i')
+			->copyright('/(\b ?|\s|^)[([]C[])]/i')
+			->quarter('/[([]1\/4[])]/')
+			->half('/[([]1\/2[])]/')
+			->threequarters('/[([]3\/4[])]/')
+			->degrees('/[([]o[])]/')
+			->plusminus('/[([]\+\/-[])]/')
 			;
 
 		# Load the generator config...
@@ -195,6 +279,8 @@ class Textile extends TextileObject
 
 		$this->span_depth = 0;
 		$this->max_span_depth = 5;	# TODO make this configurable
+
+#		$this->glyphs->dump();
 	}
 
 
@@ -210,7 +296,7 @@ class Textile extends TextileObject
 		static $pnct = null;
 		if( null === $subs ) {
 		  $pnct = ".,\"'?!;:‹›«»„“”‚‘’";
-			$subs = array( '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?', '/'=>'\/', '['=>'\[', ']'=>'\]', '('=>'\(', ')'=>'\)', '{'=>'\{', '}'=>'\}' );
+			$subs = array( '-'=>'\-', '_'=>'\_', '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?', '/'=>'\/', '['=>'\[', ']'=>'\]', '('=>'\(', ')'=>'\)', '{'=>'\{', '}'=>'\}' );
 		}
 
 		if( $this->span_depth <= $this->max_span_depth )
@@ -258,10 +344,8 @@ class Textile extends TextileObject
 	 */
 	public function AddParseListener( $event, $listener )
 	{
-		if( !is_string($event) || empty($event) )
-			throw new TextileProgrammerException( 'Invalid $event name supplied -- should be a string.' );
-		if( !is_callable( $listener ) )
-			throw new TextileProgrammerException( 'Invalid $listener supplied -- not callable.' );
+		self::validateString( $event, 'Invalid $event name supplied -- should be a non-empty string.' );
+		self::validateCallable( $listener, 'Invalid $listener supplied -- not callable.' );
 		$this->parse_listeners[$event][] = $listener;
 	}
 
@@ -269,21 +353,28 @@ class Textile extends TextileObject
    *	Interfaces for setting up Glyph & Span rules.
 	 * What is a glyph and what is a span?
 	 */
-	public function DefineGlyph( $name, $pattern, $replacement )
+	public function DefineGlyph( $name, $pattern )
 	{
+		self::validateString($name, 'Invalid glyph $name supplied -- should be a non-empty string.' );
+		self::validatestring($pattern, 'Invalid glyph $pattern supplied -- should be a non-empty string.' );
+		$this->glyphs->add($name, $pattern);
+	}
+
+	public function RemoveGlyph( $name )
+	{
+		self::validateString($name, 'Invalid glyph $name supplied -- should be a non-empty string.' );
+		$this->glyphs->remove($name);
 	}
 
 	/**
-	 *	Allows plugins to extend the standard set of textile spans...
+	 *	allows plugins to extend the standard set of textile spans...
 	 */
 	public function DefineSpan( $name, $openmarker, $closemarker = null )
 	{
 		if( null === $closemarker) 
 			$closemarker = $openmarker;
-		else {
-			if( !is_string($closemarker) || empty($closemarker) )
-				throw new TextileProgrammerException( 'Invalid $closemarker given -- should be ommited, set to null or a non-empty string.' );
-		}
+		else
+			self::validateString( $closemarker, 'invalid $closemarker given -- should be ommited, set to null or a non-empty string.' );
 
 		$this->spans->addAsymmetricSpan( $name, $openmarker, $closemarker );
 	}
@@ -440,6 +531,39 @@ class Textile extends TextileObject
 		return $text;
 	}
 
+	# Allows correct glyphing around spans.
+	public function StoreTags($opentag,$closetag='')
+	{
+		$key = ($this->tag_index++);
+
+		$key = str_pad( (string)$key, 10, '0', STR_PAD_LEFT ); # $key must be of fixed length to allow proper matching in retrieveTags
+		$this->tagCache[$key] = array('open'=>$opentag, 'close'=>$closetag);
+		$tags = array(
+			'open'  => "textileopentag{$key} ",
+			'close' => " textileclosetag{$key}",
+		);
+		return $tags;
+	}
+
+	public function RetrieveTags($text)
+	{
+		$text = preg_replace_callback('/textileopentag([\d]{10}) /' , array(&$this, 'fRetrieveOpenTags'),  $text);
+		$text = preg_replace_callback('/ textileclosetag([\d]{10})/', array(&$this, 'fRetrieveCloseTags'), $text);
+		return $text;
+	}
+
+	public function fRetrieveOpenTags($m)
+	{
+		list(, $key ) = $m;
+		return $this->tagCache[$key]['open'];
+	}
+
+	public function fRetrieveCloseTags($m)
+	{
+		list(, $key ) = $m;
+		return $this->tagCache[$key]['close'];
+	}
+
 
   # ===========================================================================
 	#
@@ -520,7 +644,47 @@ class Textile extends TextileObject
 
 	public function ParseGlyphs($text)
 	{
+		// fix: hackish -- adds a space if final char of text is a double quote.
+#		$text = preg_replace('/"\z/', "\" ", $text);
+
+		#
+		#   We don't want to do glyph replacements inside any HTML tags that might be in the source text
+		# so split on <tag...> boundaries to give a sequence of text <tag> text <tag> fragments...
+		#
+		$text = preg_split("@(<[\w/!?].*>)@Us", $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+		$i = 0;
+		$glyphs = $this->glyphs->getData();
+		foreach($text as $line) {
+			if (++$i % 2) {
+				// raw < > & chars are already entity encoded in restricted mode
+				if (!$this->restricted) {
+					$line = preg_replace('/&(?!#?[a-z0-9]+;)/i', '&amp;', $line);
+					$line = strtr($line, array('<' => '&lt;', '>' => '&gt;'));
+				}
+
+				foreach( $glyphs as $name => $regex ) {
+//$this->dump("Doing glyph[$name] with regex[$regex].");
+					$this->current_glyph = $name;
+	        $line = preg_replace_callback( $regex, array(&$this, "_FoundGlyph"), $line );
+				}
+			}
+			$glyph_out[] = $line;
+		}
+		return join('', $glyph_out);
+		
 		return $text;
+	}
+
+	protected function _FoundGlyph( $m )
+	{
+		$this->TriggerParseEvent( 'glyph:' . $this->current_glyph, $m );
+		$handler = 'TextileOutputGenerator::'.$this->current_glyph.'_GlyphHandler';
+		if( is_callable( $handler ) )
+			return call_user_func( $handler, $this->current_glyph, $m );
+		elseif( is_callable('TextileOutputGenerator::default_GlyphHandler') )
+			return call_user_func( 'TextileOutputGenerator::default_GlyphHandler' , $this->current_glyph, $m );
+		else
+			return $m[0];
 	}
 
 
@@ -530,7 +694,7 @@ class Textile extends TextileObject
 		$handler = 'TextileOutputGenerator::'.$this->current_span.'_SpanHandler';
 		if( is_callable( $handler ) )
 			return call_user_func( $handler, $this->current_span, $m );
-		elseif('TextileOutputGenerator::default_SpanHandler')
+		elseif( is_callable('TextileOutputGenerator::default_SpanHandler') )
 			return call_user_func( 'TextileOutputGenerator::default_SpanHandler' , $this->current_span, $m );
 		else
 			return $m[0];
@@ -580,7 +744,7 @@ class Textile extends TextileObject
 					$out[count($out)-1] .= $c1;
 				
 				list(,$tag,$atts,$ext,$cite,$graf) = $m; // new block
-				list($o1, $o2, $content, $c2, $c1, $eat) = $this->_fBlock(array(0,$tag,$atts,$ext,$cite,$graf));
+				list($o1, $o2, $content, $c2, $c1, $eat) = $this->_FoundBlock(array(0,$tag,$atts,$ext,$cite,$graf));
 
 				// leave off c1 if this block is extended, we'll close it at the start of the next block
 				if ($ext)
@@ -592,7 +756,7 @@ class Textile extends TextileObject
 				// anonymous block
 				$anon = 1;
 				if ($ext or !preg_match('/^ /', $block)) {
-					list($o1, $o2, $content, $c2, $c1, $eat) = $this->_fBlock(array(0,$tag,$atts,$ext,$cite,$block));
+					list($o1, $o2, $content, $c2, $c1, $eat) = $this->_FoundBlock(array(0,$tag,$atts,$ext,$cite,$block));
 					// skip $o1/$c1 because this is part of a continuing extended block
 					if ($tag == 'p' and !$this->HasRawText($content)) {
 						$block = $content;
@@ -654,13 +818,25 @@ class Textile extends TextileObject
 		$this->encode     = $encode;
 		$this->noimage    = $noimage;
 		$this->strict     = $strict;
-		$this->rel        = $rel;
+		$this->rel        = ($rel) ? ' rel="'.$rel.'"' : '';
 		$this->restricted = false;
 
-		$this->TryOutputHandler( 'initials', $text );
+		$this->tag_index = 1;
+
+		#
+		#	TODO determine if this is dead code -- Is 'encode' mode used anywhere?
+		#
+		if ($encode) {
+			$text = preg_replace("/&(?![#a-z0-9]+;)/i", "x%x%", $text);
+			$text = str_replace("x%x%", "&amp;", $text);
+			return $text;
+		}
 
 		# Do standard textile initialisation...
-		$text = $this->CleanWhiteSpace( $text );
+		$this->TryOutputHandler( 'global:initials', $text );
+
+		if( !$strict )
+			$text = $this->CleanWhiteSpace( $text );
 
 		#
 		#	Setup the standard block handlers...
@@ -670,19 +846,26 @@ class Textile extends TextileObject
 		#
 		#	Start parsing...
 		#
-		$text = $this->_ParseBlocks( $text );
+		if( !$lite ) {
+			$text = $this->_ParseBlocks( $text );
+		}
 
 		#
 		#	Replacement time...
 		#
 		$text = $this->RetrieveFragment($text);
+		$text = preg_replace('/glyph:([^<]+)/','$1',$text);	# Replace the glyph marker -- this was added for 2.2 to allow caps spans in table cells. Might be better to fix the table stuff!
+		$text = $this->retrieveTags($text);
 
-		$this->TryOutputHandler( 'finals', $text );
+		$this->span_depth = 0;
+
+		$this->TryOutputHandler( 'global:finals', $text );
+
 		return $text;
 	}
 
 
-	protected function _fBlock($m)
+	protected function _FoundBlock($m)
 	{
 		list(, $tag, $att, $ext, $cite, $content) = $m;
 		$atts = $this->ParseBlockAttributes($att);
