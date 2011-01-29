@@ -56,7 +56,7 @@ class TextileOutputGenerator
 	# 
   # ===========================================================================
 	static public function ParseListener( $event )
-	{
+	{	# TODO FIXME BROKEN -- events not namespaced anymore.
 		$parse_event = $event[0];
 		if( !in_array( $parse_event, array( 'global:initials', 'global:finals' ) ) )    # Indent non initials/finals events...
 			$parse_label = "\t$parse_event";
@@ -229,6 +229,44 @@ class TextileOutputGenerator
 
   # ===========================================================================
 	#
+	# Link handler...
+	#
+  # ===========================================================================
+	static public function LinkHandler( $m )
+	{
+#self::$parser->dump( "Handling Links.", $m);
+		list(, $pre, $atts, $text, $title, $url, $slash, $post, $tail) = $m;
+
+		if( '$' === $text ) $text = $url;
+
+		$atts = self::$parser->ParseBlockAttributes($atts);
+		$atts .= ($title != '') ? ' title="' . self::$parser->EncodeHTML($title) . '"' : '';
+
+#		if (!$this->noimage)
+#			$text = $this->image($text);
+
+		$text = self::$parser->ParseSpans($text);	
+		$text = self::$parser->ParseGlyphs($text);	
+#		$url = $this->shelveURL($url.$slash); # Need to work on the fragment storage -- can URLs be shelved the same way?
+
+		$opentag = '<a href="' . $url . '"' . $atts . self::$parser->rel . '>';
+		$closetag = '</a>';
+		$tags = self::$parser->storeTags($opentag, $closetag);
+		$out = $tags['open'].trim($text).$tags['close'];
+
+		if (($pre and !$tail) or ($tail and !$pre))
+		{
+			$out = $pre.$out.$post.$tail;
+			$post = '';
+		}
+
+		return self::$parser->ShelveFragment($out).$post;
+
+	}
+
+
+  # ===========================================================================
+	#
 	# Span handlers...
 	#
   # ===========================================================================
@@ -265,7 +303,7 @@ class TextileOutputGenerator
 		$content = self::$parser->ParseSpans($content);
 		$opentag = '<'.$span.$atts.'>';
 		$closetag = '</'.$span.'>';
-		$tags = self::$parser->storeTags($opentag, $closetag);	
+		$tags = self::$parser->storeTags($opentag, $closetag);	# FIXME storeTags not UCC.
 		$out = "{$tags['open']}{$content}{$end}{$tags['close']}";
 
 		if (($pre and !$tail) or ($tail and !$pre))

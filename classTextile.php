@@ -624,7 +624,7 @@ class Textile extends TextileObject
 		}
 
 #		$text = $this->getRefs($text);
-#		$text = $this->links($text);
+		$text = $this->_ParseLinks($text);
 #		if (!$this->noimage)
 #			$text = $this->image($text);
 
@@ -639,6 +639,32 @@ class Textile extends TextileObject
 		$text = $this->ParseGlyphs($text);
 
 		return rtrim($text, "\n");
+	}
+
+	protected function _ParseLinks($text)
+	{
+		return preg_replace_callback('/
+			(^|(?<=[\s>.\(])|[{[]) # $pre
+			"                      # start
+			(' . $this->patterns->c . ')     # $atts
+			([^"]+?)               # $text
+			(?:\(([^)]+?)\)(?="))? # $title
+			":
+			('.$this->patterns->urlch.'+?)   # $url
+			(\/)?                  # $slash
+			([^\w\/;]*?)           # $post
+			([\]}]|(?=\s|$|\)))
+		/x', array(&$this, "_FoundLink"), $text);
+	}
+
+
+	public function _FoundLink( &$m)
+	{
+		$this->TriggerParseEvent( 'link:link', $m );
+		$out = $this->TryOutputHandler('LinkHandler', $m);
+		if( false === $out )
+		  $out = $m[0];
+		return $out;
 	}
 
 
@@ -806,9 +832,9 @@ class Textile extends TextileObject
 		$this->TriggerParseEvent( $name, $in );
 		$name = "TextileOutputGenerator::$name";
 		if( !is_callable( $name ) )
-		  return;
+		  return false;
 
-		call_user_func( $name, $in );
+		return call_user_func( $name, $in );
 	}
 
 
@@ -833,7 +859,7 @@ class Textile extends TextileObject
 		}
 
 		# Do standard textile initialisation...
-		$this->TryOutputHandler( 'global:initials', $text );
+		$this->TryOutputHandler( 'Initials', $text );
 
 		if( !$strict )
 			$text = $this->CleanWhiteSpace( $text );
@@ -859,7 +885,7 @@ class Textile extends TextileObject
 
 		$this->span_depth = 0;
 
-		$this->TryOutputHandler( 'global:finals', $text );
+		$this->TryOutputHandler( 'Finals', $text );
 
 		return $text;
 	}
