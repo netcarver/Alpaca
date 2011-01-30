@@ -766,6 +766,7 @@ class Textile extends AlpacaObject
 	}
 	public function _storeRef($m)
 	{
+		$this->TriggerParseEvent( 'url:shared', $m );
 		list(, $flag, $url) = $m;
 		$this->urlrefs[$flag] = $url;
 		return '';
