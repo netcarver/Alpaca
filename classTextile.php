@@ -695,7 +695,7 @@ class Textile extends AlpacaObject
 
 		if (!$this->lite) {
 #			$text = $this->table($text);
-#			$text = $this->lists($text);
+			$text = $this->parseLists($text);
 		}
 
 		$text = $this->ParseSpans($text);
@@ -705,6 +705,75 @@ class Textile extends AlpacaObject
 
 		return rtrim($text, "\n");
 	}
+
+
+	public function parseLists($text)
+	{
+		return preg_replace_callback("/^([#*;:]+{$this->patterns->lc}[ .].*)$(?![^#*;:])/smU", array(&$this, "_foundList"), $text);
+	}
+
+	function getListType($in) # Todo use internal list type rather than HTML?
+	{
+		return preg_match("/^#+/", $in) ? 'o' : ((preg_match("/^\*+/", $in)) ? 'u' : 'd');
+	}
+	function doTagBr($tag, $in)
+	{
+		return preg_replace_callback('@<('.preg_quote($tag).')([^>]*?)>(.*)(</\1>)@s', array(&$this, 'fBr'), $in);
+	}
+	function fBr($m)
+	{
+		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![#*;:\s|])@", '$1<br />'."\n", $m[3]);
+		return '<'.$m[1].$m[2].'>'.$content.$m[4];
+	}
+
+	public function _foundList($m)
+	{
+		$text = preg_split('/\n(?=[*#;:])/m', $m[0]);
+		$pt = '';
+		foreach($text as $nr => $line) {
+			$nextline = isset($text[$nr+1]) ? $text[$nr+1] : false;
+			if (preg_match("/^([#*;:]+)({$this->patterns->lc})[ .](.*)$/s", $line, $m)) {
+				list(, $tl, $atts, $content) = $m;
+				$content = trim($content);
+				$nl = '';
+				$ltype = $this->getListType($tl);
+				$litem = (strpos($tl, ';') !== false) ? 'dt' : ((strpos($tl, ':') !== false) ? 'dd' : 'li');
+				$showitem = (strlen($content) > 0);
+
+				if (preg_match("/^([#*;:]+)({$this->patterns->lc})[ .].*/", $nextline, $nm))
+					$nl = $nm[1];
+
+				if ((strpos($pt, ';') !== false) && (strpos($tl, ':') !== false)) {
+					$lists[$tl] = 2; // We're already in a <dl> so flag not to start another
+				}
+
+				$atts = $this->ParseBlockAttributes($atts);
+				if (!isset($lists[$tl])) {
+					$lists[$tl] = 1;
+					$line = "\t<" . $ltype . "l$atts>" . (($showitem) ? "\n\t\t<$litem>" . $content : '');
+				} else {
+					$line = ($showitem) ? "\t\t<$litem$atts>" . $content : '';
+				}
+
+				if((strlen($nl) <= strlen($tl))) $line .= (($showitem) ? "</$litem>" : '');
+				foreach(array_reverse($lists) as $k => $v) {
+					if(strlen($k) > strlen($nl)) {
+						$line .= ($v==2) ? '' : "\n\t</" . $this->getListType($k) . "l>";
+						if((strlen($k) > 1) && ($v != 2))
+							$line .= "</".$litem.">";
+						unset($lists[$k]);
+					}
+				}
+				$pt = $tl; // Remember the current Textile tag
+			}
+			else {
+				$line .= "\n";
+			}
+			$out[] = $line;
+		}
+		return $this->doTagBr($litem, join("\n", $out));
+	}
+
 
 	function parseImages($text)
 	{
@@ -829,9 +898,7 @@ class Textile extends AlpacaObject
 	protected function _FootnoteRefFound($id, $nolink, $t)
 	{
 		$this->TriggerParseEvent( 'graf:fnref' , $id , $nolink, $t );	
-#		if( is_callable( AlpacaOutputGenerator::FootnoteIDHandler( $id, $nolink, $t ) ) )
-			return call_user_func( 'AlpacaOutputGenerator::FootnoteIDHandler', $id, $nolink, $t );
-#		return $t;
+		return call_user_func( 'AlpacaOutputGenerator::FootnoteIDHandler', $id, $nolink, $t );
 	}
 
 
@@ -912,7 +979,7 @@ class Textile extends AlpacaObject
 
 	function HasRawText($text)
 	{
-	  # TODO This list needs to be expandable!
+	  # TODO This list needs to be expandable! This also has HTML in it -- so it shouldn't really be in the parser.
 		// checks whether the text has text not already enclosed by a block tag
 		$r = trim(preg_replace('@<(p|blockquote|div|form|table|ul|ol|dl|pre|h\d)[^>]*?'.chr(62).'.*</\1>@s', '', trim($text)));
 		$r = trim(preg_replace('@<(hr|br)[^>]*?/>@', '', $r));
@@ -922,7 +989,6 @@ class Textile extends AlpacaObject
 
 	protected function TryOutputHandler( $name, &$in )
 	{
-		//$this->TriggerParseEvent( $name, $in ); # TODO Should this be triggering parse events? Perhaps better to do that explicitly from the point this is called.
 		$name = "AlpacaOutputGenerator::$name";
 		if( !is_callable( $name ) )
 		  return false;
@@ -952,6 +1018,7 @@ class Textile extends AlpacaObject
 		}
 
 		# Do standard textile initialisation...
+		$this->TriggerParseEvent( 'doc:initials' );
 		$this->TryOutputHandler( 'Initials', $text );
 
 		if( !$strict )
@@ -978,7 +1045,8 @@ class Textile extends AlpacaObject
 		$text = $this->RetrieveURLs($text);
 
 		$this->span_depth = 0;
-
+		
+		$this->TriggerParseEvent( 'doc:finals' );
 		$this->TryOutputHandler( 'Finals', $text );
 
 		return $text;
