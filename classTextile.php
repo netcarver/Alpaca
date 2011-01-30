@@ -106,9 +106,9 @@ class AlpacaSpan
 	
 	public function __construct( $name, $open, $close )
 	{
-		$this->data['name']  = $name;
-		$this->data['open']  = $open;
-		$this->data['close'] = $close;
+		$this->data['name']    = $name;
+		$this->data['open']    = $open;
+		$this->data['close']   = $close;
 	}
 	public function __get($key)           { return $this->data[$key]; }
 	public function getKey($open,$close)  { if( ($open === $this->data['open']) && ($close === $this->data['close']) ) return $this->data['name']; else return false; }
@@ -120,33 +120,77 @@ class AlpacaSpan
  */
 class AlpacaSpanSet extends AlpacaObject
 {
-	protected $data;
+	protected $enabled;
+	protected $disabled;
+	protected $label;
 
-	public function __construct()             { $this->data = array(); }
-	public function __call($name, $args)      { return $this->addAsymmetricSpan( $name, @$args[0], ( (isset($args[1]))? $args[1] : @$args[0]) ); }
-	public function getData()                 { return $this->data; }
-
+	public function __construct($label)
+	{ 
+		self::validateString($label, 'Invalid SpanSets $label -- must be a non-empty string'); 
+		$this->label    = $label; 
+		$this->enabled  = array(); 
+		$this->disabled = array(); 
+	}
+	public function getData()                 
+	{ 
+		return $this->enabled; 
+	}
+	public function disable($name)
+	{ 
+		self::validateString($name, 'Invalid span $name -- must be a non-empty string'); 
+		if( empty($this->enabled) )
+			return $this;
+		foreach ($this->enabled as $key=>$span) {
+			if ($span->name === $name) {
+				$this->disabled[$key] = $this->enabled[$key];
+				unset($this->enabled[$key]);
+			}
+		}
+		ksort($this->disabled);	# ksorts needed to restore original order after transfer (in which keys are preserved but order isn't)
+		return $this; 
+	}
+	public function enable($name)           
+	{ 
+		self::validateString($name, 'Invalid span $name -- must be a non-empty string');
+		if( empty($this->disabled) )
+			return $this;
+		foreach ($this->disabled as $key=>$span) {
+			if ($span->name === $name) {
+				$this->enabled[$key] = $this->disabled[$key];
+				unset($this->disabled[$key]);
+			}
+		}
+		ksort($this->enabled);
+		return $this; 
+	}
 	public function addAsymmetricSpan( $name, $open, $close )
 	{
 		self::validateString($name,  'Invalid span $name -- must be non-empty string');
 		self::validateString($open,  'Invalid span $open -- must be non-empty string');
 		self::validateString($close, 'Invalid span $close -- must be non-empty string');
 
-		$this->data[] = new AlpacaSpan( $name, $open, $close );
+		$this->enabled[] = new AlpacaSpan( $name, $open, $close );
 		return $this;
 	}
-
 	public function lookupSpanName($open,$close=null) # TODO fix this to work with span objects...
 	{
 		if( null === $close ) $close = $open;
 		$key = false;
-		foreach( $this->data as $entry ) {
+		foreach( $this->enabled as $entry ) {
 			if( ($entry['open'] == $open) && ($entry['close'] == $close) )
 				return $entry['name'];
 		}
 		return $key;
 	}
-	public function dump($label) { if(is_string($label) && !empty($label)) parent::dump("=== Data for $label... ==="); parent::dump($this->data); return $this; }
+	public function __call($name, $args)
+	{ 
+		return $this->addAsymmetricSpan( $name, @$args[0], ( (isset($args[1]))? $args[1] : @$args[0]) ); 
+	}
+	public function dump() 
+	{ 
+		parent::dump( "=== Data for {$this->label}... ===" , "Enabled..." , $this->enabled , "Disabled..." , $this->disabled );
+		return $this; 
+	}
 }
 
 /**
@@ -246,7 +290,7 @@ class Textile extends AlpacaObject
 		/**
 		 *	By default, the standard textile spans are now *named* after the HTML tag that should be emmitted for them.
 		 */
-		$this->spans = new AlpacaSpanSet();
+		$this->spans = new AlpacaSpanSet('Spans');
 		$this->spans	# TODO make sure each of these spans is covered in the test cases.
 			->verbatim('==')
 			->verbatim('<notextile>', '</notextile>')
@@ -262,7 +306,9 @@ class Textile extends AlpacaObject
 			->ins('+')
 			->sub('~')
 			->sup('^')
-			#->dump('spans')
+			->disable('verbatim')	# default disabled for lite mode (!lite mode will enable these)
+			->disable('code')			# ditto...
+//			->dump()
 			;
 
 		$this->glyphs = new AlpacaDataBag('Glyph match patterns');
@@ -716,6 +762,8 @@ class Textile extends AlpacaObject
 	{
 		return preg_match("/^#+/", $in) ? 'o' : ((preg_match("/^\*+/", $in)) ? 'u' : 'd');
 	}
+
+
 	function doTagBr($tag, $in)
 	{
 		return preg_replace_callback('@<('.preg_quote($tag).')([^>]*?)>(.*)(</\1>)@s', array(&$this, 'fBr'), $in);
@@ -1007,6 +1055,7 @@ class Textile extends AlpacaObject
 		$this->restricted = false;
 
 		$this->tag_index = 1;
+		$this->blocktags = array('p','bq');
 
 		#
 		#	TODO determine if this is dead code -- Is 'encode' mode used anywhere?
@@ -1017,24 +1066,24 @@ class Textile extends AlpacaObject
 			return $text;
 		}
 
+		if (!$lite) {
+			$this->spans	
+				->enable('verbatim')
+				->enable('code');
+			$this->blocktags = array('h[1-6]', 'p', 'notextile', 'pre', '###', 'fn\d+', 'hr', 'bq', 'bc' );
+		}
+
 		# Do standard textile initialisation...
 		$this->TriggerParseEvent( 'doc:initials' );
 		$this->TryOutputHandler( 'Initials', $text );
 
-		if( !$strict )
+		if (!$strict)
 			$text = $this->CleanWhiteSpace( $text );
-
-		#
-		#	Setup the standard block handlers...
-		#
-		$this->blocktags = array('h[1-6]', 'p', 'notextile', 'pre', '###', 'fn\d+', 'hr', 'bq', 'bc' );
 
 		#
 		#	Start parsing...
 		#
-		if( !$lite ) {
-			$text = $this->_ParseBlocks( $text );
-		}
+		$text = $this->_ParseBlocks( $text );
 
 		#
 		#	Replacement time...
@@ -1043,11 +1092,16 @@ class Textile extends AlpacaObject
 		$text = preg_replace('/glyph:([^<]+)/','$1',$text);	# Replace the glyph marker -- this was added for 2.2 to allow caps spans in table cells. Might be better to fix the table stuff!
 		$text = $this->retrieveTags($text);
 		$text = $this->RetrieveURLs($text);
-
-		$this->span_depth = 0;
 		
 		$this->TriggerParseEvent( 'doc:finals' );
 		$this->TryOutputHandler( 'Finals', $text );
+
+		if (!$lite) {
+			$this->spans
+				->disable('verbatim')
+				->disable('code');
+		}
+		$this->span_depth = 0;
 
 		return $text;
 	}
