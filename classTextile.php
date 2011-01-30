@@ -734,10 +734,13 @@ class Textile extends AlpacaObject
 
   protected function _ParseParagraph( $text )
 	{
-		if (!$this->lite) {
+	  #
+		#	The following non-lite block is now taken care of by the span parser.
+		#
+#		if (!$this->lite) {
 #			$text = $this->noTextile($text);
 #			$text = $this->code($text);
-		}
+#		}
 
 		$text = $this->getRefs($text);
 		$text = $this->_ParseLinks($text);
@@ -862,7 +865,7 @@ class Textile extends AlpacaObject
 
 	public function _foundImage($m)
 	{
-		$this->TriggerParseEvent( 'image:image', $m );	# TODO triggering a parse event happens from TryOutputHandler too! Could lead to double event triggers on single events.
+		$this->TriggerParseEvent( 'image:image', $m );	
 		$out = $this->TryOutputHandler('ImageHandler', $m);
 		if( false === $out )
 		  $out = $m[0];
@@ -889,7 +892,7 @@ class Textile extends AlpacaObject
 
 	public function _foundLink( &$m)
 	{
-		$this->TriggerParseEvent( 'link:link', $m );	# TODO triggering a parse event happens from TryOutputHandler too! Could lead to double event triggers on single events.
+		$this->TriggerParseEvent( 'link:link', $m );	
 		$out = $this->TryOutputHandler('LinkHandler', $m);
 		if( false === $out )
 		  $out = $m[0];
