@@ -371,8 +371,8 @@ class Textile extends AlpacaObject
 			{
 				$open  = strtr( $span->open,  $subs );
 				$close = strtr( $span->close, $subs );
-				$this->current_span = $span->name;
-				$text = preg_replace_callback("/
+				$this->current_span[] = $span->name;
+				$regex = "/
 					(^|(?<=[\s>$pnct\(])|[{[])        # pre
 					($open)(?!$open)                  # tag
 					({$this->patterns->c})            # atts
@@ -381,7 +381,10 @@ class Textile extends AlpacaObject
 					([$pnct]*)                        # end
 					($close)													# closetag
 					($|[\]}]|(?=[[:punct:]]{1,2}|\s|\))) # tail
-				/x", array(&$this, "_FoundSpan"), $text);
+				/x";
+#$this->dump( "Looking for {$span->name} span matching...", $regex );
+				$text = preg_replace_callback( $regex, array(&$this, "_FoundSpan"), $text);
+				array_pop( $this->current_span );
 			}
 		}
 		$this->span_depth--;
@@ -927,12 +930,14 @@ class Textile extends AlpacaObject
 
 	protected function _FoundSpan( $m )
 	{
-		$this->TriggerParseEvent( 'span:' . $this->current_span, $m );
-		$handler = 'AlpacaOutputGenerator::'.$this->current_span.'_SpanHandler';
+		$span_name = end($this->current_span);
+		$this->TriggerParseEvent( 'span:' . $span_name, $m );
+#	$this->dump( "Found span [{$span_name}]." , $m );
+		$handler = 'AlpacaOutputGenerator::'.$span_name.'_SpanHandler';
 		if( is_callable( $handler ) )
-			return call_user_func( $handler, $this->current_span, $m );
+			return call_user_func( $handler, $span_name, $m );
 		elseif( is_callable('AlpacaOutputGenerator::default_SpanHandler') )
-			return call_user_func( 'AlpacaOutputGenerator::default_SpanHandler' , $this->current_span, $m );
+			return call_user_func( 'AlpacaOutputGenerator::default_SpanHandler' , $span_name, $m );
 		else
 			return $m[0];
 	}
