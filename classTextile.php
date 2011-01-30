@@ -220,7 +220,7 @@ class Textile extends AlpacaObject
   protected $parse_listeners  = array();	# DB of listeners to parse events.
 	protected $block_handlers   = array();	# DB of registered textplug callbacks
 	protected $glyphs           = null;			# standard-textile glyph markers
-	protected $patterns         = null;			# standard-textile regex patterns
+	protected $regex         = null;			# standard-textile regex patterns
 	protected $spans            = null;			# standard-textile span start/end markers
 	protected $blocktags        = array();
 	protected $restricted       = true;			# Alpaca runs in restricted mode unless invoked via 'TextileThis()'
@@ -254,23 +254,23 @@ class Textile extends AlpacaObject
 
 		@define('alpaca_has_unicode', @preg_match('/\pL/u', 'a')); // Detect if Unicode is compiled into PCRE
 
-		$this->patterns = new AlpacaDataBag('General regex patterns');
+		$this->regex = new AlpacaDataBag('General regex patterns');
 		if( alpaca_has_unicode ) {
-			$this->patterns
+			$this->regex
 				->acr('\p{Lu}\p{Nd}')
 				->abr('\p{Lu}')
 				->nab('\p{Ll}')
 				->wrd('(?:\p{L}|\p{M}|\p{N}|\p{Pc})')
 				->mod('u');
 		} else {
-			$this->patterns
+			$this->regex
 				->acr('A-Z0-9')
 				->abr('A-Z')
 				->nab('a-z')
 				->wrd('\w')
 				->mod('');
 		}
-		$this->patterns
+		$this->regex
 			->hlgn("(?:\<(?!>)|(?<!<)\>|\<\>|\=|[()]+(?! ))")
 		  ->vlgn("[\-^~]")
 		  ->clas("(?:\([^)\n]+\))")		# Don't allow classes/ids/languages/styles to span across newlines
@@ -278,10 +278,10 @@ class Textile extends AlpacaObject
 		  ->styl("(?:\{[^}\n]+\})")
 		  ->cspn("(?:\\\\\d+)")
 		  ->rspn("(?:\/\d+)")
-		  ->a("(?:{$this->patterns->hlgn}|{$this->patterns->vlgn})*")
-		  ->s("(?:{$this->patterns->cspn}|{$this->patterns->rspn})*")
-		  ->c("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge}|{$this->patterns->hlgn})*")
-		  ->lc("(?:{$this->patterns->clas}|{$this->patterns->styl}|{$this->patterns->lnge})*")
+		  ->a("(?:{$this->regex->hlgn}|{$this->regex->vlgn})*")
+		  ->s("(?:{$this->regex->cspn}|{$this->regex->rspn})*")
+		  ->c("(?:{$this->regex->clas}|{$this->regex->styl}|{$this->regex->lnge}|{$this->regex->hlgn})*")
+		  ->lc("(?:{$this->regex->clas}|{$this->regex->styl}|{$this->regex->lnge})*")
 			->urlch('[\w"$\-_.+!*\'(),";\/?:@=&%#{}|\\^~\[\]`]')
 			->pnc('[[:punct:]]')
 			#->dump()
@@ -315,14 +315,14 @@ class Textile extends AlpacaObject
 
 		$this->glyphs = new AlpacaDataBag('Glyph match patterns');
 		$this->glyphs
-		  ->apostrophe('/('.$this->patterns->wrd.')\'('.$this->patterns->wrd.')/'.$this->patterns->mod)
-			->initapostrophe('/(\s)\'(\d+'.$this->patterns->wrd.'?)\b(?![.]?['.$this->patterns->wrd.']*?\')/'.$this->patterns->mod)
-			->singleclose('/(\S)\'(?=\s|'.$this->patterns->pnc.'|<|$)/')
+		  ->apostrophe('/('.$this->regex->wrd.')\'('.$this->regex->wrd.')/'.$this->regex->mod)
+			->initapostrophe('/(\s)\'(\d+'.$this->regex->wrd.'?)\b(?![.]?['.$this->regex->wrd.']*?\')/'.$this->regex->mod)
+			->singleclose('/(\S)\'(?=\s|'.$this->regex->pnc.'|<|$)/')
 			->singleopen('/\'/')
-			->doubleclose('/(\S)\"(?=\s|'.$this->patterns->pnc.'|<|$)/')
+			->doubleclose('/(\S)\"(?=\s|'.$this->regex->pnc.'|<|$)/')
 			->doubleopen('/"/')
-			->abbr('/\b(['.$this->patterns->abr.']['.$this->patterns->acr.']{2,})\b(?:[(]([^)]*)[)])/'.$this->patterns->mod)
-			->caps('/(?<=\s|^|[>(;-])(['.$this->patterns->abr.']{3,})(['.$this->patterns->nab.']*)(?=\s|'.$this->patterns->pnc.'|<|$)(?=[^">]*?(<|$))/'.$this->patterns->mod )
+			->abbr('/\b(['.$this->regex->abr.']['.$this->regex->acr.']{2,})\b(?:[(]([^)]*)[)])/'.$this->regex->mod)
+			->caps('/(?<=\s|^|[>(;-])(['.$this->regex->abr.']{3,})(['.$this->regex->nab.']*)(?=\s|'.$this->regex->pnc.'|<|$)(?=[^">]*?(<|$))/'.$this->regex->mod )
 		  ->ellipsis('/([^.]?)\.{3}/')
 		  ->emdash('/(\s?)--(\s?)/')
 			->endash('/\s-(?:\s|$)/')
@@ -375,7 +375,7 @@ class Textile extends AlpacaObject
 				$regex = "/
 					(^|(?<=[\s>$pnct\(])|[{[])        # pre
 					($open)(?!$open)                  # tag
-					({$this->patterns->c})            # atts
+					({$this->regex->c})            # atts
 					(?::(\S+))?                       # cite
 					([^\s$close]+|\S.*?[^\s$close\n]) # content
 					([$pnct]*)                        # end
@@ -500,7 +500,7 @@ class Textile extends AlpacaObject
 			}
 
 			if ($element == 'td' or $element == 'tr') {
-				if (preg_match("/($this->patterns->vlgn)/", $matched, $vert))
+				if (preg_match("/($this->regex->vlgn)/", $matched, $vert))
 					$style[] = "vertical-align:" . $this->vAlign($vert[1]);	# TODO no coverage of vAlign in current test cases.
 			}
 
@@ -530,7 +530,7 @@ class Textile extends AlpacaObject
 				$matched = str_replace($pr[0], '', $matched);
 			}
 
-			if (preg_match("/({$this->patterns->hlgn})/", $matched, $horiz))
+			if (preg_match("/({$this->regex->hlgn})/", $matched, $horiz))
 				$style[] = "text-align:" . $this->HorizontalAlign($horiz[1]);
 
       # If a textile class block attribute was found, split it into the css class and css id (if any)...
@@ -778,7 +778,7 @@ class Textile extends AlpacaObject
 
 	public function parseLists($text)
 	{
-		return preg_replace_callback("/^([#*;:]+{$this->patterns->lc}[ .].*)$(?![^#*;:])/smU", array(&$this, "_foundList"), $text);
+		return preg_replace_callback("/^([#*;:]+{$this->regex->lc}[ .].*)$(?![^#*;:])/smU", array(&$this, "_foundList"), $text);
 	}
 
 	function getListType($in) # Todo use internal list type rather than HTML?
@@ -803,7 +803,7 @@ class Textile extends AlpacaObject
 		$pt = '';
 		foreach($text as $nr => $line) {
 			$nextline = isset($text[$nr+1]) ? $text[$nr+1] : false;
-			if (preg_match("/^([#*;:]+)({$this->patterns->lc})[ .](.*)$/s", $line, $m)) {
+			if (preg_match("/^([#*;:]+)({$this->regex->lc})[ .](.*)$/s", $line, $m)) {
 				list(, $tl, $atts, $content) = $m;
 				$content = trim($content);
 				$nl = '';
@@ -811,7 +811,7 @@ class Textile extends AlpacaObject
 				$litem = (strpos($tl, ';') !== false) ? 'dt' : ((strpos($tl, ':') !== false) ? 'dd' : 'li');
 				$showitem = (strlen($content) > 0);
 
-				if (preg_match("/^([#*;:]+)({$this->patterns->lc})[ .].*/", $nextline, $nm))
+				if (preg_match("/^([#*;:]+)({$this->regex->lc})[ .].*/", $nextline, $nm))
 					$nl = $nm[1];
 
 				if ((strpos($pt, ';') !== false) && (strpos($tl, ':') !== false)) {
@@ -852,7 +852,7 @@ class Textile extends AlpacaObject
 			(?:[[{])?		            # pre
 			\!				              # opening !
 			(\<|\=|\>)? 	          # optional alignment atts
-			({$this->patterns->c})	# optional style,class atts
+			({$this->regex->c})	# optional style,class atts
 			(?:\. )?		            # optional dot-space
 			([^\s(!]+)		          # presume this is the src
 			\s? 			              # optional space
@@ -878,11 +878,11 @@ class Textile extends AlpacaObject
 		return preg_replace_callback('/
 			(^|(?<=[\s>.\(])|[{[]) # $pre
 			"                      # start
-			(' . $this->patterns->c . ')     # $atts
+			(' . $this->regex->c . ')     # $atts
 			([^"]+?)               # $text
 			(?:\(([^)]+?)\)(?="))? # $title
 			":
-			('.$this->patterns->urlch.'+?)   # $url
+			('.$this->regex->urlch.'+?)   # $url
 			(\/)?                  # $slash
 			([^\w\/;]*?)           # $post
 			([\]}]|(?=\s|$|\)))
@@ -996,7 +996,7 @@ class Textile extends AlpacaObject
 
 		foreach($blocks as $block) {
 			$anon = 0;
-			if (preg_match("/^($tre)({$this->patterns->a}{$this->patterns->c})\.(\.?)(?::(\S+))? (.*)$/s", $block, $m)) {
+			if (preg_match("/^($tre)({$this->regex->a}{$this->regex->c})\.(\.?)(?::(\S+))? (.*)$/s", $block, $m)) {
 				
 				if ($ext) // last block was extended, so close it
 					$out[count($out)-1] .= $c1;
@@ -1117,7 +1117,7 @@ class Textile extends AlpacaObject
 		$text = preg_replace('/glyph:([^<]+)/','$1',$text);	# Replace the glyph marker -- this was added for 2.2 to allow caps spans in table cells. Might be better to fix the table stuff!
 		$text = $this->retrieveTags($text);
 		$text = $this->RetrieveURLs($text);
-		
+	
 		$this->TriggerParseEvent( 'doc:finals' );
 		$this->TryOutputHandler( 'Finals', $text );
 
