@@ -739,7 +739,7 @@ class Textile extends AlpacaObject
 #			$text = $this->code($text);
 		}
 
-#		$text = $this->getRefs($text);
+		$text = $this->getRefs($text);
 		$text = $this->_ParseLinks($text);
 		if (!$this->noimage)
 			$text = $this->parseImages($text);
@@ -755,6 +755,20 @@ class Textile extends AlpacaObject
 		$text = $this->ParseGlyphs($text);
 
 		return rtrim($text, "\n");
+	}
+
+	
+	# Reads the foot-note like [name]http://url declarations of shared URLs.
+	public function getRefs($text)
+	{
+		return preg_replace_callback("/^\[(.+)\]((?:http:\/\/|\/)\S+)(?=\s|$)/Um",
+			array(&$this, "_storeRef"), $text);
+	}
+	public function _storeRef($m)
+	{
+		list(, $flag, $url) = $m;
+		$this->urlrefs[$flag] = $url;
+		return '';
 	}
 
 
@@ -828,7 +842,7 @@ class Textile extends AlpacaObject
 	}
 
 
-	function parseImages($text)
+	public function parseImages($text)
 	{
 		return preg_replace_callback("/
 			(?:[[{])?		            # pre
@@ -845,7 +859,7 @@ class Textile extends AlpacaObject
 		/x", array(&$this, "_foundImage"), $text);
 	}
 
-	function _foundImage($m)
+	public function _foundImage($m)
 	{
 		$this->TriggerParseEvent( 'image:image', $m );	# TODO triggering a parse event happens from TryOutputHandler too! Could lead to double event triggers on single events.
 		$out = $this->TryOutputHandler('ImageHandler', $m);
@@ -1170,7 +1184,7 @@ class Textile extends AlpacaObject
 	  		call_user_func( $listener, $args );
 			}
 		}
-		$listeners = $this->parse_listeners['*'];	# Send the event to any 'global' event listeners...
+		$listeners = @$this->parse_listeners['*'];	# Send the event to any 'global' event listeners...
 		if( !empty($listeners) ) {
 			foreach( $listeners as $listener ) {
 				$args = func_get_args();

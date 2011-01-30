@@ -14,7 +14,12 @@ class AlpacaOutputGenerator
 	public function __construct( Textile &$parser )
 	{
 		self::$parser  = $parser;		# TODO validate $parser is textile object
-		self::$verbose = true;			# change to true for more output.
+		self::$verbose = false;			# change to true for more output.
+
+		#
+		#	Uncomment the following line and the lines marked {1} and {2} below to add a new glyph and replacement to the parser
+		#
+//		self::$parser->DefineGlyph('smiley', '/:-\)/');	# {1} declare the glyph name "smiley" and match pattern to the parser. You must correctly escape your match patterns for use in a preg_replace.
 
 		self::$glyphs  = new AlpacaDataBag('Glyph replacement patterns');
 		self::$glyphs
@@ -38,12 +43,13 @@ class AlpacaOutputGenerator
 			->threequarters(alpaca_threequarters)
 			->caps('<span class="caps">glyph:$1</span>$2')
 			->abbr('<acronym title="$2">$1</acronym>')
-			#->dump()
+//		->smiley('SMILE!') # {2} This line defines the replacement pattern used for the glyph. If no pattern is found, the parser will attempt to call smiley_GlyphHandler() instead;
 			;
 
-		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
-
-#		self::$parser->DefineGlyph('smiley', '@:-)@');
+		#
+		#	Uncomment the following line to register a parse listener on all events.
+		#
+#		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
 	}
 
 
@@ -75,11 +81,8 @@ class AlpacaOutputGenerator
 
 	static public function TidyLineBreaks( $in )
 	{
-//		$start = $in;
 		$tmp = preg_replace_callback('@<(p)([^>]*?)>(.*)(</\1>)@s', 'AlpacaOutputGenerator::InsertLooseParaBreaks', $in);
 		$out = preg_replace('/<br>/', '<br />', $tmp);	# TODO: Speed this up -- No need for preg_ here -- in fact, any need to do this at all?
-//if($start !== $in) self::$parser->dump( $start, $in );
-//		$text = str_replace("<br />", "<br />\n", $text);
 		return $out;
 	}
 
@@ -89,7 +92,6 @@ class AlpacaOutputGenerator
 		# row may start with a smiley or perhaps something like '#8 bolt...' or '*** stars...'
 		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![\s|])@", '$1<br />'."\n", $m[3]);
 		$out = '<'.$m[1].$m[2].'>'.$content.$m[4];
-//self::$parser->dump(__METHOD__, $m, $out);
 	  return $out;
 	}
 
@@ -108,7 +110,7 @@ class AlpacaOutputGenerator
 
 	static public function bq_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
-#//			$cite = $this->shelveURL($cite);
+#			$cite = $this->shelveURL($cite);
 		$cite = ($cite != '') ? ' cite="' . $cite . '"' : '';
 		$o1 = "\t<blockquote$cite$atts>\n";
 		$o2 = "\t\t<p".self::$parser->ParseBlockAttributes($att, '', 0).">";
@@ -175,7 +177,6 @@ class AlpacaOutputGenerator
 
 	static public function default_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
-		#echo $content,"\n\n";
 		if( $tag === '###' ) 
 		  return array( '', '', '', '', '', true );
 
@@ -217,7 +218,6 @@ class AlpacaOutputGenerator
 	static public function default_GlyphHandler( $glyph, &$m )
 	{
 		$out = self::$glyphs->get($glyph);
-#self::$parser->dump( "Handling glyph[$glyph] -> [$out].", $m);
 		if( !isset($out) )
 			return $m[0];
 		
@@ -242,8 +242,8 @@ class AlpacaOutputGenerator
 		$atts = self::$parser->ParseBlockAttributes($atts);
 		$atts .= ($title != '') ? ' title="' . self::$parser->EncodeHTML($title) . '"' : '';
 
-#		if (!$this->noimage)
-#			$text = $this->image($text);
+#		if (!self::$parser->noimage)
+#			$text = self::$parser->parseImages($text);
 
 		$text = self::$parser->ParseSpans($text);	
 		$text = self::$parser->ParseGlyphs($text);	
