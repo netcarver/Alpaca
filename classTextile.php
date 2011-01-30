@@ -296,6 +296,7 @@ class Textile extends AlpacaObject
 			->verbatim('<notextile>', '</notextile>')
 			->code('@')
 			->code('<code>','</code>')
+			->pre('<pre>','</pre>')
 			->b('**')
 			->strong('*')
 			->cite('??')
@@ -308,6 +309,7 @@ class Textile extends AlpacaObject
 			->sup('^')
 			->disable('verbatim')	# default disabled for lite mode (!lite mode will enable these)
 			->disable('code')			# ditto...
+			->disable('pre')			# ditto... TODO (check this)
 //			->dump()
 			;
 
@@ -1053,7 +1055,6 @@ class Textile extends AlpacaObject
 		$this->strict     = $strict;
 		$this->rel        = ($rel) ? ' rel="'.$rel.'"' : '';
 		$this->restricted = false;
-
 		$this->tag_index = 1;
 		$this->blocktags = array('p','bq');
 
@@ -1069,7 +1070,8 @@ class Textile extends AlpacaObject
 		if (!$lite) {
 			$this->spans	
 				->enable('verbatim')
-				->enable('code');
+				->enable('code')
+				->enable('pre');
 			$this->blocktags = array('h[1-6]', 'p', 'notextile', 'pre', '###', 'fn\d+', 'hr', 'bq', 'bc' );
 		}
 
@@ -1099,7 +1101,8 @@ class Textile extends AlpacaObject
 		if (!$lite) {
 			$this->spans
 				->disable('verbatim')
-				->disable('code');
+				->disable('code')
+				->disable('pre');
 		}
 		$this->span_depth = 0;
 

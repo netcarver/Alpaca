@@ -14,7 +14,7 @@ class AlpacaOutputGenerator
 	public function __construct( Textile &$parser )
 	{
 		self::$parser  = $parser;		# TODO validate $parser is textile object
-		self::$verbose = false;			# change to true for more output.
+		self::$verbose = true;			# change to true for more output.
 
 		self::$glyphs  = new AlpacaDataBag('Glyph replacement patterns');
 		self::$glyphs
@@ -56,20 +56,16 @@ class AlpacaOutputGenerator
 	# 
   # ===========================================================================
 	static public function ParseListener( $event )
-	{	# TODO FIXME BROKEN -- events not namespaced anymore.
-		$parse_event = $event[0];
-		if( !in_array( $parse_event, array( 'global:initials', 'global:finals' ) ) )    # Indent non initials/finals events...
+	{	
+		$parse_event = $parse_label = $event[0];
+		if( !in_array( $parse_event, array( 'doc:initials', 'doc:finals' ) ) )    # Indent non initials/finals events...
 			$parse_label = "\t$parse_event";
 
-		$parts = explode( ':', $parse_event );
-		if( $parts[0] === 'glyph' ) {
-
-			if( self::$verbose ) 
-				self::$parser->dump( $parse_label, $event[1] );
-
+		if (self::$verbose) {
+			self::$parser->dump( $parse_label );
 		}
 
-		if( $parse_event === 'global:finals' )	# limit debug to first full set (if verbose is on)
+		if( $parse_event === 'doc:finals' )	# limit debug to first full set (if verbose is on)
 			self::$verbose = false;
 
 		# Extensions could build auxiliary structures, 
