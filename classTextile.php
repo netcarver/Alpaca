@@ -1,54 +1,54 @@
 <?php
 
-@define('txt_quote_single_open',  '&#8216;');
-@define('txt_quote_single_close', '&#8217;');
-@define('txt_quote_double_open',  '&#8220;');
-@define('txt_quote_double_close', '&#8221;');
-@define('txt_apostrophe',         '&#8217;');
-@define('txt_prime',              '&#8242;');
-@define('txt_prime_double',       '&#8243;');
-@define('txt_ellipsis',           '&#8230;');
-@define('txt_emdash',             '&#8212;');
-@define('txt_endash',             '&#8211;');
-@define('txt_dimension',          '&#215;');
-@define('txt_trademark',          '&#8482;');
-@define('txt_registered',         '&#174;');
-@define('txt_copyright',          '&#169;');
-@define('txt_half',               '&#189;');
-@define('txt_quarter',            '&#188;');
-@define('txt_threequarters',      '&#190;');
-@define('txt_degrees',            '&#176;');
-@define('txt_plusminus',          '&#177;');
+@define('alpaca_quote_single_open',  '&#8216;');
+@define('alpaca_quote_single_close', '&#8217;');
+@define('alpaca_quote_double_open',  '&#8220;');
+@define('alpaca_quote_double_close', '&#8221;');
+@define('alpaca_apostrophe',         '&#8217;');
+@define('alpaca_prime',              '&#8242;');
+@define('alpaca_prime_double',       '&#8243;');
+@define('alpaca_ellipsis',           '&#8230;');
+@define('alpaca_emdash',             '&#8212;');
+@define('alpaca_endash',             '&#8211;');
+@define('alpaca_dimension',          '&#215;');
+@define('alpaca_trademark',          '&#8482;');
+@define('alpaca_registered',         '&#174;');
+@define('alpaca_copyright',          '&#169;');
+@define('alpaca_half',               '&#189;');
+@define('alpaca_quarter',            '&#188;');
+@define('alpaca_threequarters',      '&#190;');
+@define('alpaca_degrees',            '&#176;');
+@define('alpaca_plusminus',          '&#177;');
 
 /**
  * Exceptions.
- * Alpaca Textile can throw a few exceptions.
+ * Alpaca can throw a few exceptions.
  */
-class TextileUnexpectedException extends Exception {}
-class TextileProgrammerException extends TextileUnexpectedException {}	# Thrown for incorrect setup which needs to fail early and loud.
+class AlpacaUnexpectedException extends Exception {}
+class AlpacaProgrammerException extends AlpacaUnexpectedException {}	# Thrown for incorrect setup which needs to fail early and loud.
 
 
 /**
  *	Common base class with some common behaviour.
  */
-abstract class TextileObject
+abstract class AlpacaObject
 {
 	static protected function validateString($s, $msg)	
 	{ 
 		if(!is_string($s) || empty($s)) 
-			throw new TextileProgrammerException($msg);
+			throw new AlpacaProgrammerException($msg);
 	}
 
 	static protected function validateExists($arg, $msg)
 	{
 		if(!isset($arg)) 
-			throw new TextileProgrammerException($msg);
+			throw new AlpacaProgrammerException($msg);
 	}
 
 	static protected function validateCallable($function, $msg)
 	{
 		if( !is_callable($function) )
-			throw new TextileProgrammerException($msg);
+			throw new AlpacaProgrammerException($msg);
 	}
 
 	/**
@@ -73,7 +73,7 @@ abstract class TextileObject
  * Helper class allows function chaining to set data...
  * data_bag->name1(value1)->name2(value2);
  */
-class TextileDataBag extends TextileObject
+class AlpacaDataBag extends AlpacaObject
 {
 	protected $data;
 	protected $container_name;
@@ -100,7 +100,7 @@ class TextileDataBag extends TextileObject
  * Spans may have symmetric open and close markers (as in textile's '*abc*') or
  * asymmetric ones (like '<notextile>abc</notextile>')
  */
-class TextileSpan
+class AlpacaSpan
 {
 	protected $data;
 	
@@ -118,7 +118,7 @@ class TextileSpan
 /**
  *	Simple class to hold a set of Spans.
  */
-class TextileSpanSet extends TextileObject
+class AlpacaSpanSet extends AlpacaObject
 {
 	protected $data;
 
@@ -132,7 +132,7 @@ class TextileSpanSet extends TextileObject
 		self::validateString($open,  'Invalid span $open -- must be non-empty string');
 		self::validateString($close, 'Invalid span $close -- must be non-empty string');
 
-		$this->data[] = new TextileSpan( $name, $open, $close );
+		$this->data[] = new AlpacaSpan( $name, $open, $close );
 		return $this;
 	}
 
@@ -152,12 +152,12 @@ class TextileSpanSet extends TextileObject
 /**
  *	Iterator for spans -- uses a copy of the span set's data to iterate over as it's used in a recursive context.
  */
-class TextileSpanIterator implements Iterator
+class AlpacaSpanIterator implements Iterator
 {
 	protected $position = 0;
 	protected $array;
 
-	public function __construct( TextileSpanSet &$set ) { $this->array = $set->getData(); }
+	public function __construct( AlpacaSpanSet &$set ) { $this->array = $set->getData(); }
 	public function rewind()    { $this->position = 0; }
 	public function current()   { return $this->array[$this->position]; }
 	public function key()       { return $this->position; }
@@ -169,7 +169,7 @@ class TextileSpanIterator implements Iterator
 /**
  *
  */
-class Textile extends TextileObject
+class Textile extends AlpacaObject
 {
 	protected $output_type      = null;
   protected $output_generator = null;
@@ -179,12 +179,15 @@ class Textile extends TextileObject
 	protected $patterns         = null;			# standard-textile regex patterns
 	protected $spans            = null;			# standard-textile span start/end markers
 	protected $blocktags        = array();
-	protected $restricted       = true;			# Textile runs in restricted mode unless invoked via 'TextileThis()'
+	protected $restricted       = true;			# Alpaca runs in restricted mode unless invoked via 'TextileThis()'
 	protected $span_depth;
 	protected $max_span_depth;
 	protected $fragments				= array();	# Stores completed output fragments for latter stitching back together.
 	protected $hu;
 	protected $url_schemes;
+	protected $ds;
+	protected $doc_root;
+
 
 	/**
 	 *
@@ -195,10 +198,20 @@ class Textile extends TextileObject
 		$this->hu = (defined('hu')) ? hu : '';
 		$this->url_schemes = array('http','https','ftp','mailto');
 
-		@define('txt_has_unicode', @preg_match('/\pL/u', 'a')); // Detect if Unicode is compiled into PCRE
+		if (defined('DIRECTORY_SEPARATOR'))
+			$this->ds = constant('DIRECTORY_SEPARATOR');
+		else
+			$this->ds = '/';
 
-		$this->patterns = new TextileDataBag('General regex patterns');
-		if( txt_has_unicode ) {
+		$this->doc_root = @$_SERVER['DOCUMENT_ROOT'];
+		if (!$this->doc_root)
+			$this->doc_root = @$_SERVER['PATH_TRANSLATED']; // IIS
+		$this->doc_root = rtrim($this->doc_root, $this->ds).$this->ds;
+
+		@define('alpaca_has_unicode', @preg_match('/\pL/u', 'a')); // Detect if Unicode is compiled into PCRE
+
+		$this->patterns = new AlpacaDataBag('General regex patterns');
+		if( alpaca_has_unicode ) {
 			$this->patterns
 				->acr('\p{Lu}\p{Nd}')
 				->abr('\p{Lu}')
@@ -233,7 +246,7 @@ class Textile extends TextileObject
 		/**
 		 *	By default, the standard textile spans are now *named* after the HTML tag that should be emmitted for them.
 		 */
-		$this->spans = new TextileSpanSet();
+		$this->spans = new AlpacaSpanSet();
 		$this->spans	# TODO make sure each of these spans is covered in the test cases.
 			->verbatim('==')
 			->verbatim('<notextile>', '</notextile>')
@@ -252,7 +265,7 @@ class Textile extends TextileObject
 			#->dump('spans')
 			;
 
-		$this->glyphs = new TextileDataBag('Glyph match patterns');
+		$this->glyphs = new AlpacaDataBag('Glyph match patterns');
 		$this->glyphs
 		  ->apostrophe('/('.$this->patterns->wrd.')\'('.$this->patterns->wrd.')/'.$this->patterns->mod)
 			->initapostrophe('/(\s)\'(\d+'.$this->patterns->wrd.'?)\b(?![.]?['.$this->patterns->wrd.']*?\')/'.$this->patterns->mod)
@@ -279,7 +292,7 @@ class Textile extends TextileObject
 		# Load the generator config...
 		$generator = "./generators/$type.php";	# TODO allow location to be redefined.
 		include_once( $generator );
-		$this->output_generator = new TextileOutputGenerator( $this );
+		$this->output_generator = new AlpacaOutputGenerator( $this );
 
 		$this->span_depth = 0;
 		$this->max_span_depth = 5;	# TODO make this configurable
@@ -305,7 +318,7 @@ class Textile extends TextileObject
 
 		if( $this->span_depth <= $this->max_span_depth )
 		{
-		  $spans = new TextileSpanIterator( $this->spans ); 
+		  $spans = new AlpacaSpanIterator( $this->spans ); 
 			foreach($spans as $span)
 			{
 				$open  = strtr( $span->open,  $subs );
@@ -677,8 +690,8 @@ class Textile extends TextileObject
 
 #		$text = $this->getRefs($text);
 		$text = $this->_ParseLinks($text);
-#		if (!$this->noimage)
-#			$text = $this->image($text);
+		if (!$this->noimage)
+			$text = $this->parseImages($text);
 
 		if (!$this->lite) {
 #			$text = $this->table($text);
@@ -693,6 +706,33 @@ class Textile extends TextileObject
 		return rtrim($text, "\n");
 	}
 
+	function parseImages($text)
+	{
+		return preg_replace_callback("/
+			(?:[[{])?		            # pre
+			\!				              # opening !
+			(\<|\=|\>)? 	          # optional alignment atts
+			({$this->patterns->c})	# optional style,class atts
+			(?:\. )?		            # optional dot-space
+			([^\s(!]+)		          # presume this is the src
+			\s? 			              # optional space
+			(?:\(([^\)]+)\))?       # optional title
+			\!				              # closing
+			(?::(\S+))? 	          # optional href
+			(?:[\]}]|(?=\s|$|\)))   # lookahead: space or end of string
+		/x", array(&$this, "_foundImage"), $text);
+	}
+
+	function _foundImage($m)
+	{
+		$this->TriggerParseEvent( 'image:image', $m );	# TODO triggering a parse event happens from TryOutputHandler too! Could lead to double event triggers on single events.
+		$out = $this->TryOutputHandler('ImageHandler', $m);
+		if( false === $out )
+		  $out = $m[0];
+		return $out;
+	}
+
+
 	protected function _ParseLinks($text)
 	{
 		return preg_replace_callback('/
@@ -706,11 +746,11 @@ class Textile extends TextileObject
 			(\/)?                  # $slash
 			([^\w\/;]*?)           # $post
 			([\]}]|(?=\s|$|\)))
-		/x', array(&$this, "_FoundLink"), $text);
+		/x', array(&$this, "_foundLink"), $text);
 	}
 
 
-	public function _FoundLink( &$m)
+	public function _foundLink( &$m)
 	{
 		$this->TriggerParseEvent( 'link:link', $m );	# TODO triggering a parse event happens from TryOutputHandler too! Could lead to double event triggers on single events.
 		$out = $this->TryOutputHandler('LinkHandler', $m);
@@ -756,11 +796,11 @@ class Textile extends TextileObject
 	protected function _FoundGlyph( $m )
 	{
 		$this->TriggerParseEvent( 'glyph:' . $this->current_glyph, $m );
-		$handler = 'TextileOutputGenerator::'.$this->current_glyph.'_GlyphHandler';
+		$handler = 'AlpacaOutputGenerator::'.$this->current_glyph.'_GlyphHandler';
 		if( is_callable( $handler ) )
 			return call_user_func( $handler, $this->current_glyph, $m );
-		elseif( is_callable('TextileOutputGenerator::default_GlyphHandler') )
-			return call_user_func( 'TextileOutputGenerator::default_GlyphHandler' , $this->current_glyph, $m );
+		elseif( is_callable('AlpacaOutputGenerator::default_GlyphHandler') )
+			return call_user_func( 'AlpacaOutputGenerator::default_GlyphHandler' , $this->current_glyph, $m );
 		else
 			return $m[0];
 	}
@@ -769,11 +809,11 @@ class Textile extends TextileObject
 	protected function _FoundSpan( $m )
 	{
 		$this->TriggerParseEvent( 'span:' . $this->current_span, $m );
-		$handler = 'TextileOutputGenerator::'.$this->current_span.'_SpanHandler';
+		$handler = 'AlpacaOutputGenerator::'.$this->current_span.'_SpanHandler';
 		if( is_callable( $handler ) )
 			return call_user_func( $handler, $this->current_span, $m );
-		elseif( is_callable('TextileOutputGenerator::default_SpanHandler') )
-			return call_user_func( 'TextileOutputGenerator::default_SpanHandler' , $this->current_span, $m );
+		elseif( is_callable('AlpacaOutputGenerator::default_SpanHandler') )
+			return call_user_func( 'AlpacaOutputGenerator::default_SpanHandler' , $this->current_span, $m );
 		else
 			return $m[0];
 	}
@@ -789,8 +829,8 @@ class Textile extends TextileObject
 	protected function _FootnoteRefFound($id, $nolink, $t)
 	{
 		$this->TriggerParseEvent( 'graf:fnref' , $id , $nolink, $t );	
-#		if( is_callable( TextileOutputGenerator::FootnoteIDHandler( $id, $nolink, $t ) ) )
-			return call_user_func( 'TextileOutputGenerator::FootnoteIDHandler', $id, $nolink, $t );
+#		if( is_callable( AlpacaOutputGenerator::FootnoteIDHandler( $id, $nolink, $t ) ) )
+			return call_user_func( 'AlpacaOutputGenerator::FootnoteIDHandler', $id, $nolink, $t );
 #		return $t;
 	}
 
@@ -848,7 +888,8 @@ class Textile extends TextileObject
 				}
 			}
 
-			$this->TryOutputHandler( 'TidyLineBreaks', $block );
+			$this->TriggerParseEvent( 'block:TidyLineBreaks', $block );
+			$block = $this->TryOutputHandler( 'TidyLineBreaks', $block );
 
 			if ($ext and $anon)
 				$out[count($out)-1] .= "\n".$block;
@@ -881,8 +922,8 @@ class Textile extends TextileObject
 
 	protected function TryOutputHandler( $name, &$in )
 	{
-		$this->TriggerParseEvent( $name, $in ); # TODO Should this be triggering parse events? Perhaps better to do that explicitly from the point this is called.
-		$name = "TextileOutputGenerator::$name";
+		//$this->TriggerParseEvent( $name, $in ); # TODO Should this be triggering parse events? Perhaps better to do that explicitly from the point this is called.
+		$name = "AlpacaOutputGenerator::$name";
 		if( !is_callable( $name ) )
 		  return false;
 
@@ -972,15 +1013,15 @@ class Textile extends TextileObject
 		#
 		# Otherwise try to pass controll to a standard output generator...
 		#
-		elseif( is_callable( "TextileOutputGenerator::{$roottag}_BlockHandler" ) ) {
-			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( "TextileOutputGenerator::{$roottag}_BlockHandler", $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
+		elseif( is_callable( "AlpacaOutputGenerator::{$roottag}_BlockHandler" ) ) {
+			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( "AlpacaOutputGenerator::{$roottag}_BlockHandler", $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
 		}
 
 	  #
 		# Finally, pass control to the default output handler...
 		#
 		else 
-			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( 'TextileOutputGenerator::default_BlockHandler', $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
+			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( 'AlpacaOutputGenerator::default_BlockHandler', $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
 
 		$content = (!$eat) ? $this->_ParseParagraph($content) : '';
 		return array($o1, $o2, $content, $c2, $c1, $eat);
@@ -1016,6 +1057,15 @@ class Textile extends TextileObject
 			'='  => 'center',
 			'>'  => 'right',
 			'<>' => 'justify');
+		return (isset($vals[$in])) ? $vals[$in] : '';
+	}
+
+	public function ImageAlign($in)
+	{
+		$vals = array(
+			'<' => 'left',
+			'=' => 'center',
+			'>' => 'right');
 		return (isset($vals[$in])) ? $vals[$in] : '';
 	}
 

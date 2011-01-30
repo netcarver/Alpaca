@@ -1,6 +1,6 @@
 <?php
 
-class TextileOutputGenerator
+class AlpacaOutputGenerator
 {
 	static protected $parser  = null;
 	static protected $glyphs;
@@ -16,32 +16,32 @@ class TextileOutputGenerator
 		self::$parser  = $parser;		# TODO validate $parser is textile object
 		self::$verbose = false;			# change to true for more output.
 
-		self::$glyphs  = new TextileDataBag('Glyph replacement patterns');
+		self::$glyphs  = new AlpacaDataBag('Glyph replacement patterns');
 		self::$glyphs
-		  ->apostrophe('$1'.txt_apostrophe.'$2')
-			->initapostrophe('$1'.txt_apostrophe.'$2')
-			->singleclose('$1'.txt_quote_single_close)
-			->singleopen(txt_quote_single_open)
-			->doubleclose('$1'.txt_quote_double_close)
-			->doubleopen(txt_quote_double_open)
-		  ->ellipsis('$1'.txt_ellipsis)
-		  ->emdash('$1'.txt_emdash.'$2')
-			->endash(' '.txt_endash.' ')
-			->dimension('$1$2'.txt_dimension.'$3')
-			->trademark('$1'.txt_trademark)
-			->registered('$1'.txt_registered)
-			->copyright('$1'.txt_copyright)
-			->degrees(txt_degrees)
-			->plusminus(txt_plusminus)
-			->quarter(txt_quarter)
-			->half(txt_half)
-			->threequarters(txt_threequarters)
+		  ->apostrophe('$1'.alpaca_apostrophe.'$2')
+			->initapostrophe('$1'.alpaca_apostrophe.'$2')
+			->singleclose('$1'.alpaca_quote_single_close)
+			->singleopen(alpaca_quote_single_open)
+			->doubleclose('$1'.alpaca_quote_double_close)
+			->doubleopen(alpaca_quote_double_open)
+		  ->ellipsis('$1'.alpaca_ellipsis)
+		  ->emdash('$1'.alpaca_emdash.'$2')
+			->endash(' '.alpaca_endash.' ')
+			->dimension('$1$2'.alpaca_dimension.'$3')
+			->trademark('$1'.alpaca_trademark)
+			->registered('$1'.alpaca_registered)
+			->copyright('$1'.alpaca_copyright)
+			->degrees(alpaca_degrees)
+			->plusminus(alpaca_plusminus)
+			->quarter(alpaca_quarter)
+			->half(alpaca_half)
+			->threequarters(alpaca_threequarters)
 			->caps('<span class="caps">glyph:$1</span>$2')
 			->abbr('<acronym title="$2">$1</acronym>')
 			#->dump()
 			;
 
-		self::$parser->AddParseListener( '*', 'TextileOutputGenerator::ParseListener');	# We want to know *everything*
+		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
 
 #		self::$parser->DefineGlyph('smiley', '@:-)@');
 	}
@@ -77,17 +77,21 @@ class TextileOutputGenerator
 		# a PostParseHandler.
 	}
 
-	static public function TidyLineBreaks( &$in )
+	static public function TidyLineBreaks( $in )
 	{
-		$in = preg_replace_callback('@<(p)([^>]*?)>(.*)(</\1>)@s', 'TextileOutputGenerator::InsertLooseParaBreaks', $in);
-		$in = preg_replace('/<br>/', '<br />', $in);	# TODO: Speed this up -- No need for preg_ here -- in fact, any need to do this at all?
+//		$start = $in;
+		$tmp = preg_replace_callback('@<(p)([^>]*?)>(.*)(</\1>)@s', 'AlpacaOutputGenerator::InsertLooseParaBreaks', $in);
+		$out = preg_replace('/<br>/', '<br />', $tmp);	# TODO: Speed this up -- No need for preg_ here -- in fact, any need to do this at all?
+//if($start !== $in) self::$parser->dump( $start, $in );
+//		$text = str_replace("<br />", "<br />\n", $text);
+		return $out;
 	}
 
 	static public function InsertLooseParaBreaks($m)
 	{
 		# Less restrictive version of fBr() ... used only in paragraphs where the next
 		# row may start with a smiley or perhaps something like '#8 bolt...' or '*** stars...'
-		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![\s|])@", '$1<br />', $m[3]);
+		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![\s|])@", '$1<br />'."\n", $m[3]);
 		$out = '<'.$m[1].$m[2].'>'.$content.$m[4];
 //self::$parser->dump(__METHOD__, $m, $out);
 	  return $out;
@@ -262,6 +266,44 @@ class TextileOutputGenerator
 
 		return self::$parser->ShelveFragment($out).$post;
 
+	}
+
+
+  # ===========================================================================
+	#
+	# Link handler...
+	#
+  # ===========================================================================
+	static public function ImageHandler($m)
+	{
+		@list(, $algn, $atts, $url, $title, $href) = $m;
+		$url = htmlspecialchars($url);
+		$atts  = self::$parser->ParseBlockAttributes($atts);
+		$atts .= ($algn != '')	? ' align="' . self::$parser->ImageAlign($algn) . '"' : '';
+
+ 		if(isset($title))
+ 		{
+ 			$title = htmlspecialchars($title);
+			$atts .= ' title="' . $title . '" alt="'	 . $title . '"';
+ 		}
+ 		else
+ 			$atts .= ' alt=""';
+
+		$size = false;
+		if (self::$parser->isRelUrl($url))
+			$size = @getimagesize(realpath(self::$parser->doc_root.ltrim($url, self::$parser->ds)));
+		if ($size) $atts .= " $size[3]";
+
+		$href = (isset($href)) ? self::$parser->shelveURL($href) : '';	# TODO does this need to be htmlspecialchar'd?
+		$url = self::$parser->shelveURL($url);
+
+		$out = array(
+			($href) ? '<a href="' . $href . '">' : '',
+			'<img src="' . $url . '"' . $atts . ' />',
+			($href) ? '</a>' : ''
+		);
+
+		return self::$parser->ShelveFragment(join('',$out));	
 	}
 
 
