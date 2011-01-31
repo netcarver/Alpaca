@@ -742,7 +742,7 @@ class Textile extends AlpacaObject
 #			$text = $this->code($text);
 #		}
 
-		$text = $this->getRefs($text);
+		$text = $this->_ParseSharedLinkRefs($text);	# TODO move into _ParseLinks()?		
 		$text = $this->_ParseLinks($text);
 		if (!$this->noimage)
 			$text = $this->parseImages($text);
@@ -762,7 +762,7 @@ class Textile extends AlpacaObject
 
 	
 	# Reads the foot-note like [name]http://url declarations of shared URLs.
-	public function getRefs($text)
+	public function _ParseSharedLinkRefs($text)
 	{
 		return preg_replace_callback("/^\[(.+)\]((?:http:\/\/|\/)\S+)(?=\s|$)/Um",
 			array(&$this, "_storeRef"), $text);
@@ -778,7 +778,8 @@ class Textile extends AlpacaObject
 
 	public function parseLists($text)
 	{
-		return preg_replace_callback("/^([#*;:]+{$this->regex->lc}[ .].*)$(?![^#*;:])/smU", array(&$this, "_foundList"), $text);
+#$this->dump( "==== Looking for a list in... ====", $text );
+		return preg_replace_callback("/^([#*;:]+{$this->regex->lc}[ .].*)$(?![^#*;:])/sU", array(&$this, "_foundList"), $text);
 	}
 
 	function getListType($in) # Todo use internal list type rather than HTML?
@@ -878,7 +879,7 @@ class Textile extends AlpacaObject
 		return preg_replace_callback('/
 			(^|(?<=[\s>.\(])|[{[]) # $pre
 			"                      # start
-			(' . $this->regex->c . ')     # $atts
+			('.$this->regex->c.')     # $atts
 			([^"]+?)               # $text
 			(?:\(([^)]+?)\)(?="))? # $title
 			":
@@ -921,7 +922,6 @@ class Textile extends AlpacaObject
 				}
 
 				foreach( $glyphs as $name => $regex ) {
-//$this->dump("Doing glyph[$name] with regex[$regex].");
 					$this->current_glyph = $name;
 	        $line = preg_replace_callback( $regex, array(&$this, "_FoundGlyph"), $line );
 				}
@@ -950,7 +950,6 @@ class Textile extends AlpacaObject
 	{
 		$span_name = end($this->current_span);
 		$this->TriggerParseEvent( 'span:' . $span_name, $m );
-#	$this->dump( "Found span [{$span_name}]." , $m );
 		$handler = 'AlpacaOutputGenerator::'.$span_name.'_SpanHandler';
 		if( is_callable( $handler ) )
 			return call_user_func( $handler, $span_name, $m );
