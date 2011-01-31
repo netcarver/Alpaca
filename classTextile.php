@@ -815,7 +815,7 @@ class Textile extends AlpacaObject
 
 		if (!$this->lite) {
 #			$text = $this->table($text);
-			$text = $this->parseLists($text);
+#			$text = $this->parseLists($text);
 		}
 
 		$text = $this->ParseSpans($text);
@@ -839,77 +839,6 @@ class Textile extends AlpacaObject
 		list(, $flag, $url) = $m;
 		$this->urlrefs[$flag] = $url;
 		return '';
-	}
-
-
-	public function parseLists($text)
-	{
-#$this->dump( "==== Looking for a list in... ====", $text );
-		return preg_replace_callback("/^([#*;:]+{$this->regex->lc}[ .].*)$(?![^#*;:])/sU", array(&$this, "_foundList"), $text);
-	}
-
-	function getListType($in) # Todo use internal list type rather than HTML?
-	{
-		return preg_match("/^#+/", $in) ? 'o' : ((preg_match("/^\*+/", $in)) ? 'u' : 'd');
-	}
-
-
-	function doTagBr($tag, $in)
-	{
-		return preg_replace_callback('@<('.preg_quote($tag).')([^>]*?)>(.*)(</\1>)@s', array(&$this, 'fBr'), $in);
-	}
-	function fBr($m)
-	{
-		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![#*;:\s|])@", '$1<br />'."\n", $m[3]);
-		return '<'.$m[1].$m[2].'>'.$content.$m[4];
-	}
-
-	public function _foundList($m)
-	{
-		$text = preg_split('/\n(?=[*#;:])/m', $m[0]);
-		$pt = '';
-		foreach($text as $nr => $line) {
-			$nextline = isset($text[$nr+1]) ? $text[$nr+1] : false;
-			if (preg_match("/^([#*;:]+)({$this->regex->lc})[ .](.*)$/s", $line, $m)) {
-				list(, $tl, $atts, $content) = $m;
-				$content = trim($content);
-				$nl = '';
-				$ltype = $this->getListType($tl);
-				$litem = (strpos($tl, ';') !== false) ? 'dt' : ((strpos($tl, ':') !== false) ? 'dd' : 'li');
-				$showitem = (strlen($content) > 0);
-
-				if (preg_match("/^([#*;:]+)({$this->regex->lc})[ .].*/", $nextline, $nm))
-					$nl = $nm[1];
-
-				if ((strpos($pt, ';') !== false) && (strpos($tl, ':') !== false)) {
-					$lists[$tl] = 2; // We're already in a <dl> so flag not to start another
-				}
-
-				$atts = $this->ParseBlockAttributes($atts);
-				if (!isset($lists[$tl])) {
-					$lists[$tl] = 1;
-					$line = "\t<" . $ltype . "l$atts>" . (($showitem) ? "\n\t\t<$litem>" . $content : '');
-				} else {
-					$line = ($showitem) ? "\t\t<$litem$atts>" . $content : '';
-				}
-
-				if((strlen($nl) <= strlen($tl))) $line .= (($showitem) ? "</$litem>" : '');
-				foreach(array_reverse($lists) as $k => $v) {
-					if(strlen($k) > strlen($nl)) {
-						$line .= ($v==2) ? '' : "\n\t</" . $this->getListType($k) . "l>";
-						if((strlen($k) > 1) && ($v != 2))
-							$line .= "</".$litem.">";
-						unset($lists[$k]);
-					}
-				}
-				$pt = $tl; // Remember the current Textile tag
-			}
-			else {
-				$line .= "\n";
-			}
-			$out[] = $line;
-		}
-		return $this->doTagBr($litem, join("\n", $out));
 	}
 
 
