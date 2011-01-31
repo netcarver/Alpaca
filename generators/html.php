@@ -6,7 +6,6 @@ class AlpacaOutputGenerator
 	static protected $glyphs;
 	static protected $verbose;
 
-
 	/**
 	 *	Constructor.
 	 * Add your listeners and extension spans/blocks/glyphs in here...
@@ -41,11 +40,9 @@ class AlpacaOutputGenerator
 			;
 
 		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
-
-#		self::$parser->DefineGlyph('smiley', '@:-)@');
 	}
 
-	public function addGlyphReplacement( $name, $replacement )
+	public function DefineGlyphReplacement( $name, $replacement )
 	{
 		self::$parser->validateString( $name, 'addGlyphReplacements require a valid $name string -- non valid or empty string given' );
 		self::$parser->validateString( $replacement, 'addGlyphReplacements require a valid $replacement string -- non valid or empty string given' );

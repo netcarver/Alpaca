@@ -465,7 +465,7 @@ class Textile extends AlpacaObject
 		return $this->output_type;
 	}
 
-	public function GetOutputGenerator()
+	public function GetGenerator()
 	{
 		return $this->output_generator;
 	}
