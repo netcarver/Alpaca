@@ -316,20 +316,20 @@ class Textile extends AlpacaObject
 
 		if (!is_dir($textplugs)) {
 		  if(!$quiet)
-				throw new TextileProgrammerException ( "Textplug location '{$textplugs}' is not a directory (or doesn't exist.)" );
+				throw new AlpacaProgrammerException ( "Textplug location '{$textplugs}' is not a directory (or doesn't exist.)" );
 			else
 			  return;
 		}
 		elseif( !is_readable($textplugs)) {
 		  if(!$quiet)
-				throw new TextileProgrammerException ( "Textplug directory '{$textplugs}' is not readable." );
+				throw new AlpacaProgrammerException ( "Textplug directory '{$textplugs}' is not readable." );
 			else
 			  return;
 		}
 
 		if( !chdir($textplugs) ) {
 		  if(!$quiet)
-				throw new TextileProgrammerException( "Couldn't chdir to '{$textplugs}'." );
+				throw new AlpacaProgrammerException( "Couldn't chdir to '{$textplugs}'." );
 			return;
 		}
 
@@ -341,6 +341,13 @@ class Textile extends AlpacaObject
 
 		  if(!$quiet) $this->dump( "Loading textplug '$textplug'..." );
 			$current_config = include_once($textplug);
+	
+			$init_function = strtr( $textplug, array( 'textplug.php'=>'TextplugInit', '.'=>'_' ) );
+			if( is_callable( $init_function ) ) {
+				call_user_func( $init_function, $this );
+			} else {
+				throw new AlpacaProgrammerException( "Textplugs must provide a callable TextplugInit() method. '$init_function' could not be called." );
+			}
 		}
 
 		chdir($cwd);
@@ -450,6 +457,10 @@ class Textile extends AlpacaObject
 		return $this->spans->lookupSpanName($open, $close);
 	}
 
+	public function GetType()
+	{
+		return $this->output_type;
+	}
   /**
 	 * @method Cleanse
 	 *
@@ -1013,7 +1024,7 @@ class Textile extends AlpacaObject
 		#
 		#	Setup the standard block handlers...
 		#
-		$this->blocktags = array('h[1-6]', 'p', 'notextile', 'pre', '###', 'fn\d+', 'hr', 'bq', 'bc' );
+		$this->blocktags = array('h[1-6]', 'p', 'notextile', 'pre', '###', 'fn\d+', 'bq', 'bc' );
 
 		#
 		#	Start parsing...
