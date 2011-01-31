@@ -39,7 +39,10 @@ class AlpacaOutputGenerator
 			->abbr('<acronym title="$2">$1</acronym>')
 			;
 
-		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
+		#
+		#	Uncomment the following line to register a parse listener on all events.
+		#
+#		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
 	}
 
 	public function DefineGlyphReplacement( $name, $replacement )
@@ -59,20 +62,16 @@ class AlpacaOutputGenerator
 	# 
   # ===========================================================================
 	static public function ParseListener( $event )
-	{	# TODO FIXME BROKEN -- events not namespaced anymore.
-		$parse_event = $event[0];
-		if( !in_array( $parse_event, array( 'global:initials', 'global:finals' ) ) )    # Indent non initials/finals events...
+	{	
+		$parse_event = $parse_label = $event[0];
+		if( !in_array( $parse_event, array( 'doc:initials', 'doc:finals' ) ) )    # Indent non initials/finals events...
 			$parse_label = "\t$parse_event";
 
-		$parts = explode( ':', $parse_event );
-		if( $parts[0] === 'glyph' ) {
-
-			if( self::$verbose ) 
-				self::$parser->dump( $parse_label, $event[1] );
-
+		if (self::$verbose) {
+			self::$parser->dump( $parse_label );
 		}
 
-		if( $parse_event === 'global:finals' )	# limit debug to first full set (if verbose is on)
+		if( $parse_event === 'doc:finals' )	# limit debug to first full set (if verbose is on)
 			self::$verbose = false;
 
 		# Extensions could build auxiliary structures, 
@@ -82,11 +81,8 @@ class AlpacaOutputGenerator
 
 	static public function TidyLineBreaks( $in )
 	{
-//		$start = $in;
 		$tmp = preg_replace_callback('@<(p)([^>]*?)>(.*)(</\1>)@s', 'AlpacaOutputGenerator::InsertLooseParaBreaks', $in);
 		$out = preg_replace('/<br>/', '<br />', $tmp);	# TODO: Speed this up -- No need for preg_ here -- in fact, any need to do this at all?
-//if($start !== $in) self::$parser->dump( $start, $in );
-//		$text = str_replace("<br />", "<br />\n", $text);
 		return $out;
 	}
 
@@ -96,7 +92,6 @@ class AlpacaOutputGenerator
 		# row may start with a smiley or perhaps something like '#8 bolt...' or '*** stars...'
 		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![\s|])@", '$1<br />'."\n", $m[3]);
 		$out = '<'.$m[1].$m[2].'>'.$content.$m[4];
-//self::$parser->dump(__METHOD__, $m, $out);
 	  return $out;
 	}
 
@@ -115,7 +110,7 @@ class AlpacaOutputGenerator
 
 	static public function bq_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
-#//			$cite = $this->shelveURL($cite);
+#			$cite = $this->shelveURL($cite);
 		$cite = ($cite != '') ? ' cite="' . $cite . '"' : '';
 		$o1 = "\t<blockquote$cite$atts>\n";
 		$o2 = "\t\t<p".self::$parser->ParseBlockAttributes($att, '', 0).">";
@@ -165,7 +160,6 @@ class AlpacaOutputGenerator
 
 	static public function default_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
-		#echo $content,"\n\n";
 		if( $tag === '###' ) 
 		  return array( '', '', '', '', '', true );
 
@@ -207,7 +201,6 @@ class AlpacaOutputGenerator
 	static public function default_GlyphHandler( $glyph, &$m )
 	{
 		$out = self::$glyphs->get($glyph);
-#self::$parser->dump( "Handling glyph[$glyph] -> [$out].", $m);
 		if( !isset($out) )
 			return $m[0];
 		
@@ -232,8 +225,8 @@ class AlpacaOutputGenerator
 		$atts = self::$parser->ParseBlockAttributes($atts);
 		$atts .= ($title != '') ? ' title="' . self::$parser->EncodeHTML($title) . '"' : '';
 
-#		if (!$this->noimage)
-#			$text = $this->image($text);
+#		if (!self::$parser->noimage)
+#			$text = self::$parser->parseImages($text);
 
 		$text = self::$parser->ParseSpans($text);	
 		$text = self::$parser->ParseGlyphs($text);	
