@@ -131,23 +131,6 @@ class AlpacaOutputGenerator
 	}
 
 
-	# TODO move this one to a new textplug.
-	static public function hr_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
-	{
-		$o1 = "<hr$atts";
-		$c1 = ' />';
-		$o2 = $c2 = '';
-		$content = rtrim( $content );
-		if( $content !== '' )
-		{
-			$o2 = ' title="';
-			$c2 = '"';
-			$content = self::$parser->ShelveFragment(self::$parser->ConditionallyEncodeHTML($content));
-		}
-		return array($o1, $o2, $content, $c2, $c1, $eat);
-	} 
-
-
 	static public function fn_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
 		if (preg_match("/fn(\d+)/", $tag, $fns)) {

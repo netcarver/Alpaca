@@ -247,6 +247,8 @@ class Textile extends AlpacaObject
 		else
 			$this->ds = '/';
 
+		@define('txt_plugin_directory', dirname(__FILE__) . $this->ds . 'textplugs-enabled');
+
 		$this->doc_root = @$_SERVER['DOCUMENT_ROOT'];
 		if (!$this->doc_root)
 			$this->doc_root = @$_SERVER['PATH_TRANSLATED']; // IIS
@@ -346,6 +348,57 @@ class Textile extends AlpacaObject
 		$this->max_span_depth = 5;	# TODO make this configurable
 
 #		$this->glyphs->dump();
+	}
+
+
+  /**
+	 *	Loads all textile plugins of the given type in non-lite modes. Plugins are loaded from the textplug directory.
+	 */
+	protected function LoadTextplugs( $quiet=true )
+	{
+		if( $this->lite )
+			return;
+
+		$cwd = getcwd();
+		$textplugs = txt_plugin_directory;
+
+		if (!is_dir($textplugs)) {
+		  if(!$quiet)
+				throw new AlpacaProgrammerException ( "Textplug location '{$textplugs}' is not a directory (or doesn't exist.)" );
+			else
+			  return;
+		}
+		elseif( !is_readable($textplugs)) {
+		  if(!$quiet)
+				throw new AlpacaProgrammerException ( "Textplug directory '{$textplugs}' is not readable." );
+			else
+			  return;
+		}
+
+		if( !chdir($textplugs) ) {
+		  if(!$quiet)
+				throw new AlpacaProgrammerException( "Couldn't chdir to '{$textplugs}'." );
+			return;
+		}
+
+		if(!$quiet) $this->dump("Textplug directory '$textplugs'");
+
+		foreach (glob("*.textplug.php") as $textplug) {
+		  if( is_dir($textplug) )
+				continue;
+
+		  if(!$quiet) $this->dump( "Loading textplug '$textplug'..." );
+			$current_config = include_once($textplug);
+	
+			$init_function = strtr( $textplug, array( 'textplug.php'=>'TextplugInit', '.'=>'_' ) );
+			if( is_callable( $init_function ) ) {
+				call_user_func( $init_function, $this );
+			} else {
+				throw new AlpacaProgrammerException( "Textplugs must provide a callable TextplugInit() method. '$init_function' could not be called." );
+			}
+		}
+
+		chdir($cwd);
 	}
 
 
@@ -455,6 +508,10 @@ class Textile extends AlpacaObject
 		return $this->spans->lookupSpanName($open, $close);
 	}
 
+	public function GetType()
+	{
+		return $this->output_type;
+	}
   /**
 	 * @method Cleanse
 	 *
@@ -1077,8 +1134,8 @@ class Textile extends AlpacaObject
 		$this->strict     = $strict;
 		$this->rel        = ($rel) ? ' rel="'.$rel.'"' : '';
 		$this->restricted = false;
-		$this->tag_index = 1;
-		$this->blocktags = array('p','bq');
+		$this->tag_index  = 1;
+		$this->blocktags  = array('p','bq');
 
 		#
 		#	TODO determine if this is dead code -- Is 'encode' mode used anywhere?
@@ -1094,7 +1151,8 @@ class Textile extends AlpacaObject
 				->enable('verbatim')
 				->enable('code')
 				->enable('pre');
-			$this->blocktags = array('h[1-6]', 'p', 'notextile', 'pre', '###', 'fn\d+', 'hr', 'bq', 'bc' );
+			$this->LoadTextplugs();
+			$this->blocktags = array('h[1-6]', 'p', 'notextile', 'pre', '###', 'fn\d+', 'bq', 'bc' );
 		}
 
 		# Do standard textile initialisation...
