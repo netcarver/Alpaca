@@ -6,7 +6,6 @@ class AlpacaOutputGenerator
 	static protected $glyphs;
 	static protected $verbose;
 
-
 	/**
 	 *	Constructor.
 	 * Add your listeners and extension spans/blocks/glyphs in here...
@@ -15,11 +14,6 @@ class AlpacaOutputGenerator
 	{
 		self::$parser  = $parser;		# TODO validate $parser is textile object
 		self::$verbose = false;			# change to true for more output.
-
-		#
-		#	Uncomment the following line and the lines marked {1} and {2} below to add a new glyph and replacement to the parser
-		#
-//		self::$parser->DefineGlyph('smiley', '/:-\)/');	# {1} declare the glyph name "smiley" and match pattern to the parser. You must correctly escape your match patterns for use in a preg_replace.
 
 		self::$glyphs  = new AlpacaDataBag('Glyph replacement patterns');
 		self::$glyphs
@@ -43,7 +37,6 @@ class AlpacaOutputGenerator
 			->threequarters(alpaca_threequarters)
 			->caps('<span class="caps">glyph:$1</span>$2')
 			->abbr('<acronym title="$2">$1</acronym>')
-//		->smiley('SMILE!') # {2} This line defines the replacement pattern used for the glyph. If no pattern is found, the parser will attempt to call smiley_GlyphHandler() instead;
 			;
 
 		#
@@ -52,6 +45,13 @@ class AlpacaOutputGenerator
 #		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
 	}
 
+	public function DefineGlyphReplacement( $name, $replacement )
+	{
+		self::$parser->validateString( $name, 'addGlyphReplacements require a valid $name string -- non valid or empty string given' );
+		self::$parser->validateString( $replacement, 'addGlyphReplacements require a valid $replacement string -- non valid or empty string given' );
+		self::$glyphs->add( $name, $replacement );
+		return $this;
+	}
 
   # ===========================================================================
 	#
