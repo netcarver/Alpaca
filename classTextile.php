@@ -33,19 +33,19 @@ class AlpacaProgrammerException extends AlpacaUnexpectedException {}	# Thrown fo
  */
 abstract class AlpacaObject
 {
-	static protected function validateString($s, $msg)	
+	static public function validateString($s, $msg)	
 	{ 
 		if(!is_string($s) || empty($s)) 
 			throw new AlpacaProgrammerException($msg);
 	}
 
-	static protected function validateExists($arg, $msg)
+	static public function validateExists($arg, $msg)
 	{
 		if(!isset($arg)) 
 			throw new AlpacaProgrammerException($msg);
 	}
 
-	static protected function validateCallable($function, $msg)
+	static public function validateCallable($function, $msg)
 	{
 		if( !is_callable($function) )
 			throw new AlpacaProgrammerException($msg);
@@ -417,6 +417,7 @@ class Textile extends AlpacaObject
 		self::validateString( $event, 'Invalid $event name supplied -- should be a non-empty string.' );
 		self::validateCallable( $listener, 'Invalid $listener supplied -- not callable.' );
 		$this->parse_listeners[$event][] = $listener;
+		return $this;
 	}
 
   /**
@@ -428,6 +429,7 @@ class Textile extends AlpacaObject
 		self::validateString($name, 'Invalid glyph $name supplied -- should be a non-empty string.' );
 		self::validatestring($pattern, 'Invalid glyph $pattern supplied -- should be a non-empty string.' );
 		$this->glyphs->add($name, $pattern);
+		return $this;
 	}
 
 	public function RemoveGlyph( $name )
@@ -447,6 +449,7 @@ class Textile extends AlpacaObject
 			self::validateString( $closemarker, 'invalid $closemarker given -- should be ommited, set to null or a non-empty string.' );
 
 		$this->spans->addAsymmetricSpan( $name, $openmarker, $closemarker );
+		return $this;
 	}
 
 	/**
@@ -461,6 +464,12 @@ class Textile extends AlpacaObject
 	{
 		return $this->output_type;
 	}
+
+	public function GetOutputGenerator()
+	{
+		return $this->output_generator;
+	}
+
   /**
 	 * @method Cleanse
 	 *

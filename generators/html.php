@@ -38,7 +38,6 @@ class AlpacaOutputGenerator
 			->threequarters(alpaca_threequarters)
 			->caps('<span class="caps">glyph:$1</span>$2')
 			->abbr('<acronym title="$2">$1</acronym>')
-			#->dump()
 			;
 
 		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
@@ -46,6 +45,13 @@ class AlpacaOutputGenerator
 #		self::$parser->DefineGlyph('smiley', '@:-)@');
 	}
 
+	public function addGlyphReplacement( $name, $replacement )
+	{
+		self::$parser->validateString( $name, 'addGlyphReplacements require a valid $name string -- non valid or empty string given' );
+		self::$parser->validateString( $replacement, 'addGlyphReplacements require a valid $replacement string -- non valid or empty string given' );
+		self::$glyphs->add( $name, $replacement );
+		return $this;
+	}
 
   # ===========================================================================
 	#
