@@ -844,7 +844,7 @@ class Textile extends AlpacaObject
 	public function parseLists($text)
 	{
 #$this->dump( "==== Looking for a list in... ====", $text );
-		return preg_replace_callback("/^([#*;:]+{$this->regex->lc}[ .].*)$(?![^#*;:])/sU", array(&$this, "_foundList"), $text);
+		return preg_replace_callback("/^([#*;:]{$this->regex->lc}[ .].*)$(?![^#*;:])/sU", array(&$this, "_foundList"), $text);
 	}
 
 	function getListType($in) # Todo use internal list type rather than HTML?
