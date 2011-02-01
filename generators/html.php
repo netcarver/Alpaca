@@ -12,7 +12,7 @@ class AlpacaOutputGenerator
 	 */
 	public function __construct( Textile &$parser )
 	{
-		self::$parser  = $parser;		# TODO validate $parser is textile object
+		self::$parser  = $parser;	
 		self::$verbose = false;			# change to true for more output.
 
 		self::$glyphs  = new AlpacaDataBag('Glyph replacement patterns');
