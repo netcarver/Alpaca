@@ -575,8 +575,8 @@ class Textile extends AlpacaObject
 			}
 
 			if ($element == 'td' or $element == 'tr') {
-				if (preg_match("/($this->regex->vlgn)/", $matched, $vert))
-					$style[] = "vertical-align:" . $this->vAlign($vert[1]);	# TODO no coverage of vAlign in current test cases.
+				if (preg_match("/({$this->regex->vlgn})/", $matched, $vert))
+					$style[] = "vertical-align:" . $this->VerticalAlign($vert[1]);	# TODO no coverage of vAlign in current test cases.
 			}
 
 			if (preg_match("/\{([^}]*)\}/", $matched, $sty)) {
@@ -823,7 +823,7 @@ class Textile extends AlpacaObject
 			$text = $this->parseImages($text);
 
 		if (!$this->lite) {
-#			$text = $this->table($text);
+			$text = $this->parseTables($text);
 			$text = $this->parseLists($text);
 		}
 
@@ -850,6 +850,98 @@ class Textile extends AlpacaObject
 		return '';
 	}
 
+	#
+	# Table handling...
+	#
+	public function parseTables($text)
+	{
+		$text = $text . "\n\n";
+		return preg_replace_callback("/^(?:table(_?{$this->regex->s}{$this->regex->a}{$this->regex->c})\.(.*)?\n)?^({$this->regex->a}{$this->regex->c}\.? ?\|.*\|)[\s]*\n\n/smU",
+			 array(&$this, "_foundTable"), $text);
+	}
+
+	public function _foundTable( $matches )
+	{
+		$tatts = $this->ParseBlockAttributes($matches[1], 'table');
+
+		$sum = trim($matches[2]) ? ' summary="'.htmlspecialchars(trim($matches[2])).'"' : '';
+		$cap = '';
+		$colgrp = $last_rgrp = '';
+		$c_row = 1;
+		foreach(preg_split("/\|\s*?$/m", $matches[3], -1, PREG_SPLIT_NO_EMPTY) as $row) {
+
+			$row = ltrim($row);
+
+			// Caption -- can only occur on row 1, otherwise treat '|=. foo |...' as a normal center-aligned cell.
+			if ( ($c_row <= 1) && preg_match("/^\|\=({$this->regex->s}{$this->regex->a}{$this->regex->c})\. ([^\n]*)(.*)/s", ltrim($row), $cmtch)) {
+				$capts = $this->ParseBlockAttributes($cmtch[1]);
+				$cap = "\t<caption".$capts.">".trim($cmtch[2])."</caption>\n";
+				$row = ltrim($cmtch[3]);
+				if( empty($row) )
+				  continue;
+			}
+			$c_row += 1;
+
+			// Colgroup
+			if (preg_match("/^\|:({$this->regex->s}{$this->regex->a}{$this->regex->c}\. .*)/m", ltrim($row), $gmtch)) {
+				$nl = strpos($row,"\n");	# Is this colgroup def missing a closing pipe? If so, there will be a newline in the middle of $row somewhere.
+				$idx=0;
+				foreach (explode('|', str_replace('.', '', $gmtch[1])) as $col) {
+					$gatts = $this->ParseBlockAttributes(trim($col), 'col');
+					$colgrp .= "\t<col".(($idx==0) ? "group".$gatts.">" : $gatts." />")."\n";
+					$idx++;
+				}
+				$colgrp .= "\t</colgroup>\n";
+
+				if($nl === false) {
+				  continue;
+				}
+				else {
+				  $row = ltrim(substr( $row, $nl ));		# Recover from our missing pipe and process the rest of the line...
+	      }
+			}
+
+			preg_match("/(:?^\|({$this->regex->vlgn})({$this->regex->s}{$this->regex->a}{$this->regex->c})\.\s*$\n)?^(.*)/sm", ltrim($row), $grpmatch);
+
+			// Row group
+			$rgrp = isset($grpmatch[2]) ? (($grpmatch[2] == '^') ? 'head' : ( ($grpmatch[2] == '~') ? 'foot' : (($grpmatch[2] == '-') ? 'body' : '' ) ) ) : '';
+			$rgrpatts = isset($grpmatch[3]) ? $this->ParseBlockAttributes($grpmatch[3]) : '';
+			$row = $grpmatch[4];
+
+			if (preg_match("/^({$this->regex->a}{$this->regex->c}\. )(.*)/m", ltrim($row), $rmtch)) {
+				$ratts = $this->ParseBlockAttributes($rmtch[1], 'tr');
+				$row = $rmtch[2];
+			} else $ratts = '';
+
+			$cells = array();
+			$cellctr = 0;
+			foreach(explode("|", $row) as $cell) {
+				$ctyp = "d";
+				if (preg_match("/^_/", $cell)) $ctyp = "h";
+				if (preg_match("/^(_?{$this->regex->s}{$this->regex->a}{$this->regex->c}\. )(.*)/", $cell, $cmtch)) {
+					$catts = $this->ParseBlockAttributes($cmtch[1], 'td');
+					$cell = $cmtch[2];
+				} else $catts = '';
+
+				$cell = $this->_ParseParagraph($cell);
+
+				if ($cellctr>0) // Ignore first 'cell': it precedes the opening pipe
+					$cells[] = $this->doTagBr("t$ctyp", "\t\t\t<t$ctyp$catts>$cell</t$ctyp>");
+
+				$cellctr++;
+			}
+			$grp = (($rgrp && $last_rgrp) ? "\t</t".$last_rgrp.">\n" : '') . (($rgrp) ? "\t<t".$rgrp.$rgrpatts.">\n" : '');
+			$last_rgrp = ($rgrp) ? $rgrp : $last_rgrp;
+			$rows[] = $grp."\t\t<tr$ratts>\n" . join("\n", $cells) . ($cells ? "\n" : "") . "\t\t</tr>";
+			unset($cells, $catts);
+		}
+
+		return "\t<table{$tatts}{$sum}>\n" .$cap. $colgrp. join("\n", $rows) . "\n".(($last_rgrp) ? "\t</t".$last_rgrp.">\n" : '')."\t</table>\n\n";
+	}
+
+	#
+	# List handling...
+	#
 	public function parseLists($text)
 	{
 		return preg_replace_callback("/^({$this->regex->lc})?([#*;:]{$this->regex->lc}[ .].*)$(?![^#*;:])/sU", array(&$this, "_foundList"), $text);
@@ -1330,6 +1422,15 @@ class Textile extends AlpacaObject
 			'<' => 'left',
 			'=' => 'center',
 			'>' => 'right');
+		return (isset($vals[$in])) ? $vals[$in] : '';
+	}
+
+	public function VerticalAlign($in)
+	{
+		$vals = array(
+			'^' => 'top',
+			'-' => 'middle',
+			'~' => 'bottom');
 		return (isset($vals[$in])) ? $vals[$in] : '';
 	}
 
