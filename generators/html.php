@@ -43,16 +43,6 @@ class AlpacaOutputGenerator
 		#	Uncomment the following line to register a parse listener on all events.
 		#
 #		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
-
-		#
-		# Examples of registering parse listeners on the list events...
-		#
-#		self::$parser->AddParseListener( 'list:start', 'AlpacaOutputGenerator::ListListener' );
-#		self::$parser->AddParseListener( 'list:start-item', 'AlpacaOutputGenerator::ListListener' );
-#		self::$parser->AddParseListener( 'list:end-item', 'AlpacaOutputGenerator::ListListener' );
-#		self::$parser->AddParseListener( 'list:end', 'AlpacaOutputGenerator::ListListener' );
-#		self::$parser->AddParseListener( 'list:new', 'AlpacaOutputGenerator::ListListener' );
-#		self::$parser->AddParseListener( 'list:done', 'AlpacaOutputGenerator::ListListener' );
 	}
 
 	public function DefineGlyphReplacement( $name, $replacement )
@@ -87,15 +77,6 @@ class AlpacaOutputGenerator
 		# Extensions could build auxiliary structures, 
 		# (like a TOC by listening to block:h events) and later place them in the document with 
 		# a PostParseHandler.
-	}
-
-	static public function ListListener( $event )
-	{
-		$parse_event = $parse_label = $event[0];
-		self::$parser
-			->dump( $parse_label )
-#			->dump( $event )
-			;
 	}
 
 
@@ -361,7 +342,6 @@ class AlpacaOutputGenerator
   # ===========================================================================
 	static public function ListStartHandler( $info )
 	{
-#self::$parser->dump( __METHOD__." -- Called with... ", $info );
     $out = "\t<{$info['listtype']}l{$info['listatts']}>";
     if( $info['has_content'] )
 			$out .= "\n";

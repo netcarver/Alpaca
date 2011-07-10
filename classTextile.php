@@ -873,21 +873,21 @@ class Textile extends AlpacaObject
 
 	public function _foundList($m)
 	{
-#$this->dump( "==== Found a list... ====" , $m[0] );
 		$this->TriggerParseEvent( 'list:new', $m[0] );
 		$text = preg_split('/\n(?=[*#;:])/m', $m[0]);
 		$lastlist = '';
 		foreach($text as $rownum => $line) {
 			$nextline = isset($text[$rownum+1]) ? $text[$rownum+1] : false;
-#$this->dump( "..Found line[$line]" );
 			if (preg_match("/^({$this->regex->lc})?([#*;:]+)({$this->regex->lc})[ .](.*)$/s", $line, $m)) {
 				list(, $listatts, $thislist, $atts, $content) = $m;
 
-				$content = trim($content);
+				$outline = '';
+				$info = array();
+				$info['content'] = $content = trim($content);
 				$atts = $this->ParseBlockAttributes($atts);
-				$has_content = (strlen($content) > 0);
+				$info['has_content'] = $has_content = (strlen($content) > 0);
 				$is_redcloth = ((strlen($listatts) > 0) && $has_content);
-				$ltype = $this->getListType($thislist);	
+				$info['listtype'] = $ltype = $this->getListType($thislist);	
 				$is_dlist = ('d' === $ltype); 
 
 				#
@@ -898,11 +898,9 @@ class Textile extends AlpacaObject
 					$listatts = $this->ParseBlockAttributes($listatts);
 				elseif (!$has_content || $is_dlist )
 					$listatts = $atts;
+				$info['listatts'] = $listatts;
 
-# $this->dump( "Is[{$ltype}l] ... Content[$content] ListAtts[$listatts] Atts[$atts]" );
-
-//$this->dump( "....Split into...", $m );
-				$litem = (strpos($thislist, ';') !== false) ? 'dt' : ((strpos($thislist, ':') !== false) ? 'dd' : 'li'); # TODO : html
+				$info['litem'] = $litem = (strpos($thislist, ';') !== false) ? 'dt' : ((strpos($thislist, ':') !== false) ? 'dd' : 'li'); # TODO : html
 
 				$nextlist = '';
 				if (preg_match("/^([#*;:]+)({$this->regex->lc})[ .].*/", $nextline, $nm))
@@ -912,33 +910,20 @@ class Textile extends AlpacaObject
 					$lists[$thislist] = 2; // We're already in a <dl> so flag not to start another  # QUESTION: why the magic number?
 				}
 
-				$outline = '';
-				$info = array();
-				$info['listtype'] = $ltype;
-				$info['listatts'] = $listatts;
-				$info['has_content'] = $has_content;
-				$info['content'] = $content;
-				$info['litem'] = $litem;
-
 				if (!isset($lists[$thislist])) {
 					$lists[$thislist] = 1;	# QUESTION: Why the magic number?
 
 					if ($is_dlist)
 						$atts = '';	# Grrr defn lists -- you apply first line atts to the list, not the item, even if not empty -- Grrr.
 
-					# list:start event...
 					$this->TriggerParseEvent( 'list:start', $info );
-				#	$outline = "\t<" . $ltype . "l$listatts>";
 					$outline = $this->TryOutputHandler( 'ListStartHandler', $info );
-				#	if($has_content)  
-				#		$outline .= "\n";
 				} 
 
 				if( $has_content )
 				{
 					$info['atts'] = $atts;
 					$this->TriggerParseEvent( 'list:start-item', $info );
-#					$outline .= "\t\t<$litem$atts>" . $content;
 					$outline .= $this->TryOutputHandler( 'ListStartItemHandler', $info );
 				}
 
@@ -954,16 +939,12 @@ class Textile extends AlpacaObject
 						# Close down one level of list nesting... list:end event...
 						if( $v != 2 )
 						{
-//							$__type = $this->getListType($k);
 							$outline .= $this->TryOutputHandler( 'ListEndHandler', $info);
-							#$outline .= "\n\t</" . $__type . "l>";
 							$this->TriggerParseEvent( 'list:end', $info );
 						}
 						if((strlen($k) > 1) && ($v != 2))
 						{
-							# End the list time... list:end-item event...
 							$outline .= $this->TryOutputHandler( 'ListEndItemHandler', $info);
-#							$outline .= "</".$litem.">";
 							$this->TriggerParseEvent( 'list:end-item', $info );
 						}
 						unset($lists[$k]);
@@ -972,8 +953,7 @@ class Textile extends AlpacaObject
 				$lastlist = $thislist; // Remember the current Textile tag
 			}
 			else {
-# Add a newline, this wasn't really a valid list.
-				$outline .= "\n";
+				$outline .= "\n"; # Add a newline, this wasn't really a valid list.
 			}
 			$outlines[] = $outline;
 		}
