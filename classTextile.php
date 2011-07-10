@@ -35,20 +35,29 @@ abstract class AlpacaObject
 {
 	static public function validateString($s, $msg)	
 	{ 
-		if(!is_string($s) || empty($s)) 
+		if(!is_string($s) || empty($s)) {
+			if(!is_string($msg) || empty($msg))
+				$msg = 'Parameter must be a non-empty string.';
 			throw new AlpacaProgrammerException($msg);
+		}
 	}
 
 	static public function validateExists($arg, $msg)
 	{
-		if(!isset($arg)) 
+		if(!isset($arg)) {
+			if( !is_string($msg) || empty($msg) )
+				$msg = 'Please supply an argument.';
 			throw new AlpacaProgrammerException($msg);
+		}
 	}
 
 	static public function validateCallable($function, $msg)
 	{
-		if( !is_callable($function) )
+		if( !is_callable($function) ) {
+			if( !is_string($msg) || empty($msg) )
+				$msg = 'Please supply a callable function.';
 			throw new AlpacaProgrammerException($msg);
+		}
 	}
 
 	/**
@@ -801,7 +810,7 @@ class Textile extends AlpacaObject
   protected function _ParseParagraph( $text )
 	{
 	  #
-		#	The following non-lite block is now taken care of by the span parser.
+		#	The following non-lite block is now taken care of by the span parser. TODO: Determine if this is sufficient.
 		#
 #		if (!$this->lite) {
 #			$text = $this->noTextile($text);
@@ -815,7 +824,7 @@ class Textile extends AlpacaObject
 
 		if (!$this->lite) {
 #			$text = $this->table($text);
-#			$text = $this->parseLists($text);
+			$text = $this->parseLists($text);
 		}
 
 		$text = $this->ParseSpans($text);
@@ -839,6 +848,118 @@ class Textile extends AlpacaObject
 		list(, $flag, $url) = $m;
 		$this->urlrefs[$flag] = $url;
 		return '';
+	}
+
+	public function parseLists($text)
+	{
+		return preg_replace_callback("/^({$this->regex->lc})?([#*;:]{$this->regex->lc}[ .].*)$(?![^#*;:])/sU", array(&$this, "_foundList"), $text);
+	}
+
+	function getListType($in) # Todo use internal list type rather than HTML?
+	{
+		return preg_match("/^#+/", $in) ? 'o' : ((preg_match("/^\*+/", $in)) ? 'u' : 'd');
+	}
+
+
+	function doTagBr($tag, $in)
+	{
+		return preg_replace_callback('@<('.preg_quote($tag).')([^>]*?)>(.*)(</\1>)@s', array(&$this, 'fBr'), $in);
+	}
+	function fBr($m)
+	{
+		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![#*;:\s|])@", '$1<br />'."\n", $m[3]);
+		return '<'.$m[1].$m[2].'>'.$content.$m[4];
+	}
+
+	public function _foundList($m)
+	{
+		$this->TriggerParseEvent( 'list:new', $m[0] );
+		$text = preg_split('/\n(?=[*#;:])/m', $m[0]);
+		$lastlist = '';
+		foreach($text as $rownum => $line) {
+			$nextline = isset($text[$rownum+1]) ? $text[$rownum+1] : false;
+			if (preg_match("/^({$this->regex->lc})?([#*;:]+)({$this->regex->lc})[ .](.*)$/s", $line, $m)) {
+				list(, $listatts, $thislist, $atts, $content) = $m;
+
+				$outline = '';
+				$info = array();
+				$info['content'] = $content = trim($content);
+				$atts = $this->ParseBlockAttributes($atts);
+				$info['has_content'] = $has_content = (strlen($content) > 0);
+				$is_redcloth = ((strlen($listatts) > 0) && $has_content);
+				$info['listtype'] = $ltype = $this->getListType($thislist);	
+				$is_dlist = ('d' === $ltype); 
+
+				#
+				# In the case of redcloth textile -- $listatts will have the list attributes.
+				# In the case of php-textile 2.2+ -- $atts will have the list atts if the content is empty or it's a dl, else it will have the item atts (for ul+ol).
+				#
+				if ($is_redcloth) 
+					$listatts = $this->ParseBlockAttributes($listatts);
+				elseif (!$has_content || $is_dlist )
+					$listatts = $atts;
+				$info['listatts'] = $listatts;
+
+				$info['litem'] = $litem = (strpos($thislist, ';') !== false) ? 'dt' : ((strpos($thislist, ':') !== false) ? 'dd' : 'li'); # TODO : html
+
+				$nextlist = '';
+				if (preg_match("/^([#*;:]+)({$this->regex->lc})[ .].*/", $nextline, $nm))
+					$nextlist = $nm[1]; 
+
+				if ((strpos($lastlist, ';') !== false) && (strpos($thislist, ':') !== false)) {
+					$lists[$thislist] = 2; // We're already in a <dl> so flag not to start another  # QUESTION: why the magic number?
+				}
+
+				if (!isset($lists[$thislist])) {
+					$lists[$thislist] = 1;	# QUESTION: Why the magic number?
+
+					if ($is_dlist)
+						$atts = '';	# Grrr defn lists -- you apply first line atts to the list, not the item, even if not empty -- Grrr.
+
+					$this->TriggerParseEvent( 'list:start', $info );
+					$outline = $this->TryOutputHandler( 'ListStartHandler', $info );
+				} 
+
+				if( $has_content )
+				{
+					$info['atts'] = $atts;
+					$this->TriggerParseEvent( 'list:start-item', $info );
+					$outline .= $this->TryOutputHandler( 'ListStartItemHandler', $info );
+				}
+
+# This closes off the previous list item (if not empty and no increase in list nesting) list:end-item event...
+				if((strlen($nextlist) <= strlen($thislist))) 
+				{
+					$outline .= $this->TryOutputHandler( 'ListEndItemHandler', $info);
+					$this->TriggerParseEvent( 'list:end-item', $info );
+				}
+
+				foreach(array_reverse($lists) as $k => $v) {
+					if(strlen($k) > strlen($nextlist)) {
+						# Close down one level of list nesting... list:end event...
+						if( $v != 2 )
+						{
+							$outline .= $this->TryOutputHandler( 'ListEndHandler', $info);
+							$this->TriggerParseEvent( 'list:end', $info );
+						}
+						if((strlen($k) > 1) && ($v != 2))
+						{
+							$outline .= $this->TryOutputHandler( 'ListEndItemHandler', $info);
+							$this->TriggerParseEvent( 'list:end-item', $info );
+						}
+						unset($lists[$k]);
+					}
+				}
+				$lastlist = $thislist; // Remember the current Textile tag
+			}
+			else {
+				$outline .= "\n"; # Add a newline, this wasn't really a valid list.
+			}
+			$outlines[] = $outline;
+		}
+
+		$this->TriggerParseEvent( 'list:done' );
+		return $this->doTagBr($litem, join("\n", $outlines));
 	}
 
 
@@ -1058,7 +1179,7 @@ class Textile extends AlpacaObject
 	{
 		$name = "AlpacaOutputGenerator::$name";
 		if( !is_callable( $name ) )
-		  return false;
+		  return false;	# TODO -- should this return $in if the output handler can't be found???
 
 		return call_user_func( $name, $in );
 	}

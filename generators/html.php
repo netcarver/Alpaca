@@ -12,7 +12,7 @@ class AlpacaOutputGenerator
 	 */
 	public function __construct( Textile &$parser )
 	{
-		self::$parser  = $parser;		# TODO validate $parser is textile object
+		self::$parser  = $parser;	
 		self::$verbose = false;			# change to true for more output.
 
 		self::$glyphs  = new AlpacaDataBag('Glyph replacement patterns');
@@ -78,6 +78,7 @@ class AlpacaOutputGenerator
 		# (like a TOC by listening to block:h events) and later place them in the document with 
 		# a PostParseHandler.
 	}
+
 
 	static public function TidyLineBreaks( $in )
 	{
@@ -198,7 +199,7 @@ class AlpacaOutputGenerator
 	# Glyph handlers...
 	#
   # ===========================================================================
-	static public function default_GlyphHandler( $glyph, &$m )
+	static public function default_GlyphHandler( $glyph, $m )
 	{
 		$out = self::$glyphs->get($glyph);
 		if( !isset($out) )
@@ -250,7 +251,7 @@ class AlpacaOutputGenerator
 
   # ===========================================================================
 	#
-	# Link handler...
+	# Image handler...
 	#
   # ===========================================================================
 	static public function ImageHandler($m)
@@ -330,6 +331,39 @@ class AlpacaOutputGenerator
 		if (($pre and !$tail) or ($tail and !$pre))
 			$out = $pre.$out.$tail;
 
+		return $out;
+	}
+
+
+  # ===========================================================================
+	#
+	# List handlers...
+	#
+  # ===========================================================================
+	static public function ListStartHandler( $info )
+	{
+    $out = "\t<{$info['listtype']}l{$info['listatts']}>";
+    if( $info['has_content'] )
+			$out .= "\n";
+		return $out;
+	}
+
+	static public function ListEndHandler( $info )
+	{
+		$out = "\n\t</" . $info['listtype'] . "l>";
+		return $out;
+	}
+
+	static public function ListStartItemHandler( $info )
+	{
+		$out = "\t\t<{$info['litem']}{$info['atts']}>{$info['content']}";
+		return $out;
+	}
+
+
+	static public function ListEndItemHandler( $info )
+	{
+		$out = (($info['has_content']) ? "</{$info['litem']}>" : '');
 		return $out;
 	}
 
