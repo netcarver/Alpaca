@@ -47,8 +47,8 @@ class AlpacaOutputGenerator
 
 	public function DefineGlyphReplacement( $name, $replacement )
 	{
-		self::$parser->validateString( $name, 'addGlyphReplacements require a valid $name string -- non valid or empty string given' );
-		self::$parser->validateString( $replacement, 'addGlyphReplacements require a valid $replacement string -- non valid or empty string given' );
+		self::$parser->validateString( $name, __METHOD__ . ' requires a valid $name string -- non valid or empty string given' );
+		self::$parser->validateString( $replacement, __METHOD__ . ' requires a valid $replacement string -- non valid or empty string given' );
 		self::$glyphs->add( $name, $replacement );
 		return $this;
 	}
@@ -83,7 +83,7 @@ class AlpacaOutputGenerator
 	static public function TidyLineBreaks( $in )
 	{
 		$tmp = preg_replace_callback('@<(p)([^>]*?)>(.*)(</\1>)@s', 'AlpacaOutputGenerator::InsertLooseParaBreaks', $in);
-		$out = preg_replace('/<br>/', '<br />', $tmp);	# TODO: Speed this up -- No need for preg_ here -- in fact, any need to do this at all?
+		$out = preg_replace('/<br>/', '<br />'."\n", $tmp);	# TODO: Speed this up -- No need for preg_ here -- in fact, any need to do this at all?
 		return $out;
 	}
 
@@ -368,6 +368,40 @@ class AlpacaOutputGenerator
 	}
 
 
+  # ===========================================================================
+	#
+	# Table handlers...
+	#
+  # ===========================================================================
+	static public function TableStartHandler( $info )
+	{
+    $out = "\t<table{$info['atts']}{$info['summary']}>\n";
+		return $out;
+	}
+
+	static public function TableEndHandler()
+	{
+		$out = "\t</table>\n\n";
+		return $out;
+	}
+
+	static public function TableCaptionHandler( $info )
+	{
+		$out = "\t<caption".$info['caption_atts'].">".trim($info['caption'])."</caption>\n";
+		return $out;
+	}
+
+	static public function TableColgroupHandler( $info )
+	{
+		$first_att = array_shift( $info['gatts'] );
+		$out  = "\t<colgroup{$first_att}>\n";
+		foreach( $info['gatts'] as $gatt )
+		{
+			$out .= "\t<col$gatt />\n";
+		}
+		$out .= "\t</colgroup>\n";
+		return $out;
+	}
 /*
 		if( $tag === 'p' ) {
 			# Is this an anonymous block with a note definition?
