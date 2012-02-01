@@ -12,19 +12,19 @@ class AlpacaOutputGenerator
 	 */
 	public function __construct( Textile &$parser )
 	{
-		self::$parser  = $parser;	
+		self::$parser  = $parser;
 		self::$verbose = false;			# change to true for more output.
 
 		self::$glyphs  = new AlpacaDataBag('Glyph replacement patterns');
 		self::$glyphs
-		  ->apostrophe('$1'.alpaca_apostrophe.'$2')
+			->apostrophe('$1'.alpaca_apostrophe.'$2')
 			->initapostrophe('$1'.alpaca_apostrophe.'$2')
 			->singleclose('$1'.alpaca_quote_single_close)
 			->singleopen(alpaca_quote_single_open)
 			->doubleclose('$1'.alpaca_quote_double_close)
 			->doubleopen(alpaca_quote_double_open)
-		  ->ellipsis('$1'.alpaca_ellipsis)
-		  ->emdash('$1'.alpaca_emdash.'$2')
+			->ellipsis('$1'.alpaca_ellipsis)
+			->emdash('$1'.alpaca_emdash.'$2')
 			->endash(' '.alpaca_endash.' ')
 			->dimension('$1$2'.alpaca_dimension.'$3')
 			->trademark('$1'.alpaca_trademark)
@@ -42,7 +42,7 @@ class AlpacaOutputGenerator
 		#
 		#	Uncomment the following line to register a parse listener on all events.
 		#
-#		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
+		#		self::$parser->AddParseListener( '*', 'AlpacaOutputGenerator::ParseListener');	# We want to know *everything*
 	}
 
 	public function DefineGlyphReplacement( $name, $replacement )
@@ -53,16 +53,16 @@ class AlpacaOutputGenerator
 		return $this;
 	}
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# The following just provided as an illustration of listening to parse events. Not likely to be
 	# too useful in an output generator as they are being called back by the very events that this would
 	# listen to anyway. However, in the case of something like an Index or TOC generation textplug, this
 	# listen ability will be useful.
-	# 
-  # ===========================================================================
+	#
+	# ===========================================================================
 	static public function ParseListener( $event )
-	{	
+	{
 		$parse_event = $parse_label = $event[0];
 		if( !in_array( $parse_event, array( 'doc:initials', 'doc:finals' ) ) )    # Indent non initials/finals events...
 			$parse_label = "\t$parse_event";
@@ -74,8 +74,8 @@ class AlpacaOutputGenerator
 		if( $parse_event === 'doc:finals' )	# limit debug to first full set (if verbose is on)
 			self::$verbose = false;
 
-		# Extensions could build auxiliary structures, 
-		# (like a TOC by listening to block:h events) and later place them in the document with 
+		# Extensions could build auxiliary structures,
+		# (like a TOC by listening to block:h events) and later place them in the document with
 		# a PostParseHandler.
 	}
 
@@ -93,14 +93,14 @@ class AlpacaOutputGenerator
 		# row may start with a smiley or perhaps something like '#8 bolt...' or '*** stars...'
 		$content = preg_replace("@(.+)(?<!<br>|<br />)\n(?![\s|])@", '$1<br />'."\n", $m[3]);
 		$out = '<'.$m[1].$m[2].'>'.$content.$m[4];
-	  return $out;
+		return $out;
 	}
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Block handlers...
 	#
-  # ===========================================================================
+	# ===========================================================================
 	static public function notextile_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
 		$content = self::$parser->ShelveFragment($content);
@@ -111,14 +111,14 @@ class AlpacaOutputGenerator
 
 	static public function bq_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
-#			$cite = $this->shelveURL($cite);
+		#			$cite = $this->shelveURL($cite);
 		$cite = ($cite != '') ? ' cite="' . $cite . '"' : '';
 		$o1 = "\t<blockquote$cite$atts>\n";
 		$o2 = "\t\t<p".self::$parser->ParseBlockAttributes($att, '', 0).">";
 		$c2 = "</p>";
 		$c1 = "\n\t</blockquote>";
 		return array($o1, $o2, $content, $c2, $c1, $eat);
-  }
+	}
 
 
 	static public function bc_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
@@ -152,21 +152,21 @@ class AlpacaOutputGenerator
 			$sup = "<sup$supp_id>$backlink</sup>";
 
 			$content = $sup . ' ' . $content;
-	    $o2 = "\t<p$atts>";
+			$o2 = "\t<p$atts>";
 			$c2 = "</p>";
-    	return array($o1, $o2, $content, $c2, $c1, $eat);
+			return array($o1, $o2, $content, $c2, $c1, $eat);
 		}
 	}
 
 
 	static public function default_BlockHandler( $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat )
 	{
-		if( $tag === '###' ) 
-		  return array( '', '', '', '', '', true );
+		if( $tag === '###' )
+			return array( '', '', '', '', '', true );
 
-    $o2 = "\t<$tag$atts>";
+		$o2 = "\t<$tag$atts>";
 		$c2 = "</$tag>";
-    return array($o1, $o2, $content, $c2, $c1, $eat);
+		return array($o1, $o2, $content, $c2, $c1, $eat);
 	}
 
 
@@ -174,14 +174,14 @@ class AlpacaOutputGenerator
 	#
 	# Footnote ID handlers...
 	#
-  # ===========================================================================
-  static public function FootnoteIDHandler($id, $nolink, $t)
+	# ===========================================================================
+	static public function FootnoteIDHandler($id, $nolink, $t)
 	{
 		$backref = '';
-	
+
 		if( self::$parser->GetFootnoteID( $id ) === $id ) {
-		  $a = uniqid(rand());
-		  self::$parser->DefineFootnoteID( $id, $a );
+			$a = uniqid(rand());
+			self::$parser->DefineFootnoteID( $id, $a );
 			$backref = 'id="fnrev'.$a.'" ';
 		}
 
@@ -194,31 +194,31 @@ class AlpacaOutputGenerator
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Glyph handlers...
 	#
-  # ===========================================================================
+	# ===========================================================================
 	static public function default_GlyphHandler( $glyph, $m )
 	{
 		$out = self::$glyphs->get($glyph);
 		if( !isset($out) )
 			return $m[0];
-		
+
 		$out = strtr( $out, array( '$1'=>@$m[1], '$2'=>@$m[2], '$3'=>@$m[3] ) );
 
 		return $out;
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Link handler...
 	#
-  # ===========================================================================
+	# ===========================================================================
 	static public function LinkHandler( $m )
 	{
-#self::$parser->dump( "Handling Links.", $m);
+		#self::$parser->dump( "Handling Links.", $m);
 		list(, $pre, $atts, $text, $title, $url, $slash, $post, $tail) = $m;
 
 		if( '$' === $text ) $text = $url;
@@ -226,11 +226,11 @@ class AlpacaOutputGenerator
 		$atts = self::$parser->ParseBlockAttributes($atts);
 		$atts .= ($title != '') ? ' title="' . self::$parser->EncodeHTML($title) . '"' : '';
 
-#		if (!self::$parser->noimage)
-#			$text = self::$parser->parseImages($text);
+		#		if (!self::$parser->noimage)
+		#			$text = self::$parser->parseImages($text);
 
-		$text = self::$parser->ParseSpans($text);	
-		$text = self::$parser->ParseGlyphs($text);	
+		$text = self::$parser->ParseSpans($text);
+		$text = self::$parser->ParseGlyphs($text);
 		$url  = self::$parser->ShelveURL($url.$slash); # Need to work on the fragment storage -- can URLs be shelved the same way?
 
 		$opentag = '<a href="' . $url . '"' . $atts . self::$parser->rel . '>';
@@ -249,11 +249,11 @@ class AlpacaOutputGenerator
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Image handler...
 	#
-  # ===========================================================================
+	# ===========================================================================
 	static public function ImageHandler($m)
 	{
 		@list(, $algn, $atts, $url, $title, $href) = $m;
@@ -261,13 +261,13 @@ class AlpacaOutputGenerator
 		$atts  = self::$parser->ParseBlockAttributes($atts);
 		$atts .= ($algn != '')	? ' align="' . self::$parser->ImageAlign($algn) . '"' : '';
 
- 		if(isset($title))
- 		{
- 			$title = htmlspecialchars($title);
+		if(isset($title))
+		{
+			$title = htmlspecialchars($title);
 			$atts .= ' title="' . $title . '" alt="'	 . $title . '"';
- 		}
- 		else
- 			$atts .= ' alt=""';
+		}
+		else
+			$atts .= ' alt=""';
 
 		$size = false;
 		if (self::$parser->isRelUrl($url))
@@ -283,19 +283,19 @@ class AlpacaOutputGenerator
 			($href) ? '</a>' : ''
 		);
 
-		return self::$parser->ShelveFragment(join('',$out));	
+		return self::$parser->ShelveFragment(join('',$out));
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Span handlers...
 	#
-  # ===========================================================================
+	# ===========================================================================
 	static public function verbatim_SpanHandler( $span, $m )
 	{
 		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
-#self::$parser->dump( __METHOD__." -- Called with [$span], matched [$tag/$closetag]." );
+		#self::$parser->dump( __METHOD__." -- Called with [$span], matched [$tag/$closetag]." );
 
 		$content = self::$parser->ShelveFragment($atts.$content);
 		return $pre.$content.$tail;
@@ -305,7 +305,7 @@ class AlpacaOutputGenerator
 	static public function code_SpanHandler( $span, $m )
 	{
 		list(, $pre, $tag, $atts, $cite, $content, $end, $closetag, $tail) = $m;
-//self::$parser->dump( __METHOD__." -- Called with [$span], matched [$tag/$closetag]." );
+		//self::$parser->dump( __METHOD__." -- Called with [$span], matched [$tag/$closetag]." );
 
 		$content = self::$parser->ShelveFragment(self::$parser->ConditionallyEncodeHTML($atts.$content));
 
@@ -335,15 +335,15 @@ class AlpacaOutputGenerator
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# List handlers...
 	#
-  # ===========================================================================
+	# ===========================================================================
 	static public function ListStartHandler( $info )
 	{
-    $out = "\t<{$info['listtype']}l{$info['listatts']}>";
-    if( $info['has_content'] )
+		$out = "\t<{$info['listtype']}l{$info['listatts']}>";
+		if( $info['has_content'] )
 			$out .= "\n";
 		return $out;
 	}
@@ -368,14 +368,14 @@ class AlpacaOutputGenerator
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Table handlers...
 	#
-  # ===========================================================================
+	# ===========================================================================
 	static public function TableStartHandler( $info )
 	{
-    $out = "\t<table{$info['atts']}{$info['summary']}>\n";
+		$out = "\t<table{$info['atts']}{$info['summary']}>\n";
 		return $out;
 	}
 
@@ -417,7 +417,7 @@ class AlpacaOutputGenerator
 			if( '' === $notedef ) # It will be empty if the regex matched and ate it.
 				return array($o1, $o2, $notedef, $c2, $c1, true);
 			}
-*/
+ */
 
 
 

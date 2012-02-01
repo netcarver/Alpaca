@@ -33,8 +33,8 @@ class AlpacaProgrammerException extends AlpacaUnexpectedException {}	# Thrown fo
  */
 abstract class AlpacaObject
 {
-	static public function validateString($s, $msg)	
-	{ 
+	static public function validateString($s, $msg)
+	{
 		if(!is_string($s) || empty($s)) {
 			if(!is_string($msg) || empty($msg))
 				$msg = 'Parameter must be a non-empty string.';
@@ -61,16 +61,16 @@ abstract class AlpacaObject
 	}
 
 	/**
-	 * 
+	 *
 	 */
-  public function dump()
+	public function dump()
 	{
 		$html = true;
-	 	static $bool = array( 0=>'false', 1=>'true' );
+		static $bool = array( 0=>'false', 1=>'true' );
 		foreach (func_get_args() as $a) {
-		  if( $html ) 
+			if( $html )
 				echo "\n<pre>", (is_array($a)) ? htmlspecialchars(var_export($a, true)) : ((is_bool($a)) ? $bool[(int)$a] : htmlspecialchars($a)), "</pre>\n";
-			else 
+			else
 				echo "\n", (is_array($a)) ? var_export($a,true) : ((is_bool($a)) ? $bool[(int)$a] : $a), "\n";
 		}
 		return $this;
@@ -112,7 +112,7 @@ class AlpacaDataBag extends AlpacaObject
 class AlpacaSpan
 {
 	protected $data;
-	
+
 	public function __construct( $name, $open, $close )
 	{
 		$this->data['name']    = $name;
@@ -120,7 +120,7 @@ class AlpacaSpan
 		$this->data['close']   = $close;
 	}
 	public function __get($key)           { return $this->data[$key]; }
-	public function getKey($open,$close)  { if( ($open === $this->data['open']) && ($close === $this->data['close']) ) return $this->data['name']; else return false; }
+		public function getKey($open,$close)  { if( ($open === $this->data['open']) && ($close === $this->data['close']) ) return $this->data['name']; else return false; }
 }
 
 
@@ -134,19 +134,19 @@ class AlpacaSpanSet extends AlpacaObject
 	protected $label;
 
 	public function __construct($label)
-	{ 
-		self::validateString($label, 'Invalid SpanSets $label -- must be a non-empty string'); 
-		$this->label    = $label; 
-		$this->enabled  = array(); 
-		$this->disabled = array(); 
+	{
+		self::validateString($label, 'Invalid SpanSets $label -- must be a non-empty string');
+		$this->label    = $label;
+		$this->enabled  = array();
+		$this->disabled = array();
 	}
-	public function getData()                 
-	{ 
-		return $this->enabled; 
+	public function getData()
+	{
+		return $this->enabled;
 	}
 	public function disable($name)
-	{ 
-		self::validateString($name, 'Invalid span $name -- must be a non-empty string'); 
+	{
+		self::validateString($name, 'Invalid span $name -- must be a non-empty string');
 		if( empty($this->enabled) )
 			return $this;
 		foreach ($this->enabled as $key=>$span) {
@@ -156,10 +156,10 @@ class AlpacaSpanSet extends AlpacaObject
 			}
 		}
 		ksort($this->disabled);	# ksorts needed to restore original order after transfer (in which keys are preserved but order isn't)
-		return $this; 
+		return $this;
 	}
-	public function enable($name)           
-	{ 
+	public function enable($name)
+	{
 		self::validateString($name, 'Invalid span $name -- must be a non-empty string');
 		if( empty($this->disabled) )
 			return $this;
@@ -170,7 +170,7 @@ class AlpacaSpanSet extends AlpacaObject
 			}
 		}
 		ksort($this->enabled);
-		return $this; 
+		return $this;
 	}
 	public function addAsymmetricSpan( $name, $open, $close )
 	{
@@ -192,13 +192,13 @@ class AlpacaSpanSet extends AlpacaObject
 		return $key;
 	}
 	public function __call($name, $args)
-	{ 
-		return $this->addAsymmetricSpan( $name, @$args[0], ( (isset($args[1]))? $args[1] : @$args[0]) ); 
+	{
+		return $this->addAsymmetricSpan( $name, @$args[0], ( (isset($args[1]))? $args[1] : @$args[0]) );
 	}
-	public function dump() 
-	{ 
+	public function dump()
+	{
 		parent::dump( "=== Data for {$this->label}... ===" , "Enabled..." , $this->enabled , "Disabled..." , $this->disabled );
-		return $this; 
+		return $this;
 	}
 }
 
@@ -225,11 +225,11 @@ class AlpacaSpanIterator implements Iterator
 class Textile extends AlpacaObject
 {
 	protected $output_type      = null;
-  protected $output_generator = null;
-  protected $parse_listeners  = array();	# DB of listeners to parse events.
+	protected $output_generator = null;
+	protected $parse_listeners  = array();	# DB of listeners to parse events.
 	protected $block_handlers   = array();	# DB of registered textplug callbacks
 	protected $glyphs           = null;			# standard-textile glyph markers
-	protected $regex         = null;			# standard-textile regex patterns
+	protected $regex            = null;			# standard-textile regex patterns
 	protected $spans            = null;			# standard-textile span start/end markers
 	protected $blocktags        = array();
 	protected $restricted       = true;			# Alpaca runs in restricted mode unless invoked via 'TextileThis()'
@@ -283,16 +283,16 @@ class Textile extends AlpacaObject
 		}
 		$this->regex
 			->hlgn("(?:\<(?!>)|(?<!<)\>|\<\>|\=|[()]+(?! ))")
-		  ->vlgn("[\-^~]")
-		  ->clas("(?:\([^)\n]+\))")		# Don't allow classes/ids/languages/styles to span across newlines
-		  ->lnge("(?:\[[^]\n]+\])")
-		  ->styl("(?:\{[^}\n]+\})")
-		  ->cspn("(?:\\\\\d+)")
-		  ->rspn("(?:\/\d+)")
-		  ->a("(?:{$this->regex->hlgn}|{$this->regex->vlgn})*")
-		  ->s("(?:{$this->regex->cspn}|{$this->regex->rspn})*")
-		  ->c("(?:{$this->regex->clas}|{$this->regex->styl}|{$this->regex->lnge}|{$this->regex->hlgn})*")
-		  ->lc("(?:{$this->regex->clas}|{$this->regex->styl}|{$this->regex->lnge})*")
+			->vlgn("[\-^~]")
+			->clas("(?:\([^)\n]+\))")		# Don't allow classes/ids/languages/styles to span across newlines
+			->lnge("(?:\[[^]\n]+\])")
+			->styl("(?:\{[^}\n]+\})")
+			->cspn("(?:\\\\\d+)")
+			->rspn("(?:\/\d+)")
+			->a("(?:{$this->regex->hlgn}|{$this->regex->vlgn})*")
+			->s("(?:{$this->regex->cspn}|{$this->regex->rspn})*")
+			->c("(?:{$this->regex->clas}|{$this->regex->styl}|{$this->regex->lnge}|{$this->regex->hlgn})*")
+			->lc("(?:{$this->regex->clas}|{$this->regex->styl}|{$this->regex->lnge})*")
 			->urlch('[\w"$\-_.+!*\'(),";\/?:@=&%#{}|\\^~\[\]`]')
 			->pnc('[[:punct:]]')
 			#->dump()
@@ -311,22 +311,22 @@ class Textile extends AlpacaObject
 			->b('**')
 			->strong('*')
 			->cite('??')
-		  ->del('-')
-      ->i('__')
+			->del('-')
+			->i('__')
 			->em('_')
-		  ->span('%')
+			->span('%')
 			->ins('+')
 			->sub('~')
 			->sup('^')
 			->disable('verbatim')	# default disabled for lite mode (!lite mode will enable these)
-			->disable('code')			# ditto...
-			->disable('pre')			# ditto... TODO (check this)
-//			->dump()
+			->disable('code')		# ditto...
+			->disable('pre')		# ditto... TODO (check this)
+			//->dump()
 			;
 
 		$this->glyphs = new AlpacaDataBag('Glyph match patterns');
 		$this->glyphs
-		  ->apostrophe('/('.$this->regex->wrd.')\'('.$this->regex->wrd.')/'.$this->regex->mod)
+			->apostrophe('/('.$this->regex->wrd.')\'('.$this->regex->wrd.')/'.$this->regex->mod)
 			->initapostrophe('/(\s)\'(\d+'.$this->regex->wrd.'?)\b(?![.]?['.$this->regex->wrd.']*?\')/'.$this->regex->mod)
 			->singleclose('/(\S)\'(?=\s|'.$this->regex->pnc.'|<|$)/')
 			->singleopen('/\'/')
@@ -334,8 +334,8 @@ class Textile extends AlpacaObject
 			->doubleopen('/"/')
 			->abbr('/\b(['.$this->regex->abr.']['.$this->regex->acr.']{2,})\b(?:[(]([^)]*)[)])/'.$this->regex->mod)
 			->caps('/(?<=\s|^|[>(;-])(['.$this->regex->abr.']{3,})(['.$this->regex->nab.']*)(?=\s|'.$this->regex->pnc.'|<|$)(?=[^">]*?(<|$))/'.$this->regex->mod )
-		  ->ellipsis('/([^.]?)\.{3}/')
-		  ->emdash('/(\s?)--(\s?)/')
+			->ellipsis('/([^.]?)\.{3}/')
+			->emdash('/(\s?)--(\s?)/')
 			->endash('/\s-(?:\s|$)/')
 			->dimension('/(\d+)( ?)x( ?)(?=\d+)/')
 			->trademark('/(\b ?|\s|^)[([]TM[])]/i')
@@ -356,11 +356,11 @@ class Textile extends AlpacaObject
 		$this->span_depth = 0;
 		$this->max_span_depth = 5;	# TODO make this configurable
 
-#		$this->glyphs->dump();
+		#		$this->glyphs->dump();
 	}
 
 
-  /**
+	/**
 	 *	Loads all textile plugins of the given type in non-lite modes. Plugins are loaded from the textplug directory.
 	 */
 	protected function LoadTextplugs( $quiet=true )
@@ -372,20 +372,20 @@ class Textile extends AlpacaObject
 		$textplugs = txt_plugin_directory;
 
 		if (!is_dir($textplugs)) {
-		  if(!$quiet)
+			if(!$quiet)
 				throw new AlpacaProgrammerException ( "Textplug location '{$textplugs}' is not a directory (or doesn't exist.)" );
 			else
-			  return;
+				return;
 		}
 		elseif( !is_readable($textplugs)) {
-		  if(!$quiet)
+			if(!$quiet)
 				throw new AlpacaProgrammerException ( "Textplug directory '{$textplugs}' is not readable." );
 			else
-			  return;
+				return;
 		}
 
 		if( !chdir($textplugs) ) {
-		  if(!$quiet)
+			if(!$quiet)
 				throw new AlpacaProgrammerException( "Couldn't chdir to '{$textplugs}'." );
 			return;
 		}
@@ -393,12 +393,12 @@ class Textile extends AlpacaObject
 		if(!$quiet) $this->dump("Textplug directory '$textplugs'");
 
 		foreach (glob("*.textplug.php") as $textplug) {
-		  if( is_dir($textplug) )
+			if( is_dir($textplug) )
 				continue;
 
-		  if(!$quiet) $this->dump( "Loading textplug '$textplug'..." );
+			if(!$quiet) $this->dump( "Loading textplug '$textplug'..." );
 			$current_config = include_once($textplug);
-	
+
 			$init_function = strtr( $textplug, array( 'textplug.php'=>'TextplugInit', '.'=>'_' ) );
 			if( is_callable( $init_function ) ) {
 				call_user_func( $init_function, $this );
@@ -412,23 +412,23 @@ class Textile extends AlpacaObject
 
 
 	/**
-   *	Span parser.
+	 *	Span parser.
 	 *  Public to allow output generators to recursively span content. eg. for *_abc_* etc.
 	 */
-	public function ParseSpans($text)	
+	public function ParseSpans($text)
 	{
 		$this->span_depth++;
 
 		static $subs = null;
 		static $pnct = null;
 		if( null === $subs ) {
-		  $pnct = ".,\"'?!;:‹›«»„“”‚‘’";
+			$pnct = ".,\"'?!;:‹›«»„“”‚‘’";
 			$subs = array( '-'=>'\-', '_'=>'\_', '*'=>'\*', '^'=>'\^', '+'=>'\+', '?'=>'\?', '/'=>'\/', '['=>'\[', ']'=>'\]', '('=>'\(', ')'=>'\)', '{'=>'\{', '}'=>'\}' );
 		}
 
 		if( $this->span_depth <= $this->max_span_depth )
 		{
-		  $spans = new AlpacaSpanIterator( $this->spans ); 
+			$spans = new AlpacaSpanIterator( $this->spans );
 			foreach($spans as $span)
 			{
 				$open  = strtr( $span->open,  $subs );
@@ -437,14 +437,14 @@ class Textile extends AlpacaObject
 				$regex = "/
 					(^|(?<=[\s>$pnct\(])|[{[])        # pre
 					($open)(?!$open)                  # tag
-					({$this->regex->c})            # atts
+					({$this->regex->c})           	  # atts
 					(?::(\S+))?                       # cite
 					([^\s$close]+|\S.*?[^\s$close\n]) # content
 					([$pnct]*)                        # end
 					($close)													# closetag
 					($|[\]}]|(?=[[:punct:]]{1,2}|\s|\))) # tail
-				/x";
-#$this->dump( "Looking for {$span->name} span matching...", $regex );
+					/x";
+				#$this->dump( "Looking for {$span->name} span matching...", $regex );
 				$text = preg_replace_callback( $regex, array(&$this, "_FoundSpan"), $text);
 				array_pop( $this->current_span );
 			}
@@ -455,7 +455,7 @@ class Textile extends AlpacaObject
 
 
 
-  /**
+	/**
 	 * Allows textplugs to extend or override the default block handlers.
 	 */
 	public function RegisterBlockHandler( $block , $handler )
@@ -464,12 +464,12 @@ class Textile extends AlpacaObject
 			return false;
 		$tmp = @$this->block_handlers[$block];
 		if( isset($tmp) && is_callable( $tmp ) )
-		  return false;
+			return false;
 		$this->block_handlers[$block] = $handler;
 		return true;
 	}
 
-  /**
+	/**
 	 * Adds a parse event listener. Not sure this is still needed.
 	 */
 	public function AddParseListener( $event, $listener )
@@ -480,8 +480,8 @@ class Textile extends AlpacaObject
 		return $this;
 	}
 
-  /**
-   *	Interfaces for setting up Glyph & Span rules.
+	/**
+	 *	Interfaces for setting up Glyph & Span rules.
 	 * What is a glyph and what is a span?
 	 */
 	public function DefineGlyph( $name, $pattern )
@@ -503,7 +503,7 @@ class Textile extends AlpacaObject
 	 */
 	public function DefineSpan( $name, $openmarker, $closemarker = null )
 	{
-		if( null === $closemarker) 
+		if( null === $closemarker)
 			$closemarker = $openmarker;
 		else
 			self::validateString( $closemarker, 'invalid $closemarker given -- should be ommited, set to null or a non-empty string.' );
@@ -530,32 +530,32 @@ class Textile extends AlpacaObject
 		return $this->output_generator;
 	}
 
-  /**
+	/**
 	 * @method Cleanse
 	 *
 	 * Cleans potentially malicious input -- used in cleansing block attributes.
 	 */
 	public function Cleanse( $in )
 	{
-	  $tmp    = $in;
-	  $before = -1;
-	  $after  = 0;
-	  while( $after != $before )
-	  {
-  	  $before = strlen( $tmp );
-  	  $tmp    = rawurldecode($tmp);
-	    $after  = strlen( $tmp );
-	  }
+		$tmp    = $in;
+		$before = -1;
+		$after  = 0;
+		while( $after != $before )
+		{
+			$before = strlen( $tmp );
+			$tmp    = rawurldecode($tmp);
+			$after  = strlen( $tmp );
+		}
 
 		$out = strtr( $tmp, array(
 			'"'=>'',
 			"'"=>'',
 			'='=>'',
-			));
+		));
 		return $out;
 	}
 
-	public function ParseBlockAttributes($in, $element = "", $include_id = 1) 
+	public function ParseBlockAttributes($in, $element = "", $include_id = 1)
 	{
 		$style = '';
 		$class = '';
@@ -609,7 +609,7 @@ class Textile extends AlpacaObject
 			if (preg_match("/({$this->regex->hlgn})/", $matched, $horiz))
 				$style[] = "text-align:" . $this->HorizontalAlign($horiz[1]);
 
-      # If a textile class block attribute was found, split it into the css class and css id (if any)...
+			# If a textile class block attribute was found, split it into the css class and css id (if any)...
 			if (preg_match("/^([-a-zA-Z0-9_]*)#([-a-zA-Z0-9_\.\:]*)$/", $class, $ids)) {
 				$id = $ids[2];
 				$class = $ids[1];
@@ -653,7 +653,7 @@ class Textile extends AlpacaObject
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Storage of parsed fragments / glyphs / urls / tags
 	#
@@ -674,7 +674,7 @@ class Textile extends AlpacaObject
 			do {
 				$old = $text;
 				$text = strtr($text, $this->fragments);
-			 } while ($text != $old);
+			} while ($text != $old);
 
 		return $text;
 	}
@@ -741,11 +741,11 @@ class Textile extends AlpacaObject
 	{
 		$parts = @parse_url(urldecode($url));
 		if ((empty($parts['scheme']) or @$parts['scheme'] == 'http') and
-			 empty($parts['host']) and
-			 preg_match('/^\w/', @$parts['path']))
+			empty($parts['host']) and
+			preg_match('/^\w/', @$parts['path']))
 			$url = $this->hu.$url;
 		if ($this->restricted and !empty($parts['scheme']) and
-				!in_array($parts['scheme'], $this->url_schemes))
+			!in_array($parts['scheme'], $this->url_schemes))
 			return '#';
 		return $url;
 	}
@@ -757,11 +757,11 @@ class Textile extends AlpacaObject
 	}
 
 
-  # ===========================================================================
+	# ===========================================================================
 	#
 	# Footnote ID interface.
 	#
-  # ===========================================================================
+	# ===========================================================================
 	public function GetFootnoteID( $key_or_default )
 	{
 		$id = @$this->fn[$key_or_default];
@@ -803,22 +803,22 @@ class Textile extends AlpacaObject
 		$out = preg_replace("/^[ \t]*\n/m", "\n", $out);	# lines containing only whitespace
 		$out = preg_replace("/\n{3,}/", "\n\n", $out);	# 3 or more line ends
 		$out = preg_replace("/^\n*/", "", $out);		# leading blank lines
-//		$out = strtr( $out, array( "\x00"=>'' ) );	# null bytes
+		//		$out = strtr( $out, array( "\x00"=>'' ) );	# null bytes
 		return $out;
 	}
 
 
-  protected function _ParseParagraph( $text )
+	protected function _ParseParagraph( $text )
 	{
-	  #
+		#
 		#	The following non-lite block is now taken care of by the span parser. TODO: Determine if this is sufficient.
 		#
-#		if (!$this->lite) {
-#			$text = $this->noTextile($text);
-#			$text = $this->code($text);
-#		}
+		#		if (!$this->lite) {
+		#			$text = $this->noTextile($text);
+		#			$text = $this->code($text);
+		#		}
 
-		$text = $this->_ParseSharedLinkRefs($text);	# TODO move into _ParseLinks()?		
+		$text = $this->_ParseSharedLinkRefs($text);	# TODO move into _ParseLinks()?
 		$text = $this->_ParseLinks($text);
 		if (!$this->noimage)
 			$text = $this->parseImages($text);
@@ -830,13 +830,13 @@ class Textile extends AlpacaObject
 
 		$text = $this->ParseSpans($text);
 		$text = $this->_ParseFootnoteRefs($text);
-#		$text = $this->noteRef($text); # TODO -- add NoteList parsing & generation
+		#		$text = $this->noteRef($text); # TODO -- add NoteList parsing & generation
 		$text = $this->ParseGlyphs($text);
 
 		return rtrim($text, "\n");
 	}
 
-	
+
 	# Reads the foot-note like [name]http://url declarations of shared URLs.
 	public function _ParseSharedLinkRefs($text)
 	{
@@ -858,7 +858,7 @@ class Textile extends AlpacaObject
 	{
 		$text = $text . "\n\n";
 		return preg_replace_callback("/^(?:table(_?{$this->regex->s}{$this->regex->a}{$this->regex->c})\.(.*)?\n)?^({$this->regex->a}{$this->regex->c}\.? ?\|.*\|)[\s]*\n\n/smU",
-			 array(&$this, "_foundTable"), $text);
+			array(&$this, "_foundTable"), $text);
 	}
 
 	public function _foundTable( $matches )
@@ -877,14 +877,14 @@ class Textile extends AlpacaObject
 		$colgrp = $last_rgrp = '';
 		$c_row = 1;
 
-		foreach(preg_split("/\|\s*?$/m", $matches[3], -1, PREG_SPLIT_NO_EMPTY) as $row) 
+		foreach(preg_split("/\|\s*?$/m", $matches[3], -1, PREG_SPLIT_NO_EMPTY) as $row)
 		{
 			$row = ltrim($row);
 
 			#
 			# Caption -- can only occur on row 1, otherwise treat '|=. foo |...' as a normal center-aligned cell.
 			#
-			if ( ($c_row <= 1) && preg_match("/^\|\=({$this->regex->s}{$this->regex->a}{$this->regex->c})\. ([^\n]*)(.*)/s", ltrim($row), $cmtch)) 
+			if ( ($c_row <= 1) && preg_match("/^\|\=({$this->regex->s}{$this->regex->a}{$this->regex->c})\. ([^\n]*)(.*)/s", ltrim($row), $cmtch))
 			{
 				$args['caption_atts'] = $this->ParseBlockAttributes($cmtch[1]);
 				$args['caption'] = $cmtch[2];
@@ -892,26 +892,26 @@ class Textile extends AlpacaObject
 				$this->TriggerParseEvent( 'table:caption' );
 				$row = ltrim($cmtch[3]);
 				if( empty($row) )
-				  continue;
+					continue;
 			}
 			$c_row += 1;
 
 			#
 			# Colgroup
 			#
-			if (preg_match("/^\|:({$this->regex->s}{$this->regex->a}{$this->regex->c}\. .*)/m", ltrim($row), $gmtch)) 
+			if (preg_match("/^\|:({$this->regex->s}{$this->regex->a}{$this->regex->c}\. .*)/m", ltrim($row), $gmtch))
 			{
 				$nl = strpos($row,"\n");	# Is this colgroup def missing a closing pipe? If so, there will be a newline in the middle of $row somewhere.
-				foreach (explode('|', str_replace('.', '', $gmtch[1])) as $col) 
+				foreach (explode('|', str_replace('.', '', $gmtch[1])) as $col)
 				{
 					$args['gatts'][] = $this->ParseBlockAttributes(trim($col), 'col');
 				}
 				$table['colgroup'] = $this->TryOutputHandler( 'TableColgroupHandler', $args );
 
-				if($nl === false) 
-				  continue;
-				else 
-				  $row = ltrim(substr( $row, $nl ));		# Recover from our missing pipe and process the rest of the line...
+				if($nl === false)
+					continue;
+				else
+					$row = ltrim(substr( $row, $nl ));		# Recover from our missing pipe and process the rest of the line...
 			}
 
 			preg_match("/(:?^\|({$this->regex->vlgn})({$this->regex->s}{$this->regex->a}{$this->regex->c})\.\s*$\n)?^(.*)/sm", ltrim($row), $grpmatch);
@@ -919,25 +919,30 @@ class Textile extends AlpacaObject
 			#
 			# Row group
 			#
-			$rgrp = isset($grpmatch[2]) ? (($grpmatch[2] == '^') ? 'head' : ( ($grpmatch[2] == '~') ? 'foot' : (($grpmatch[2] == '-') ? 'body' : '' ) ) ) : '';
+			static $rowgroup_mappings = array( '^'=>'head', '~'=>'foot', '-'=>'body' );
+			$rgrp = '';
+			if( isset($grpmatch[2]) && array_key_exists($grpmatch[2], $rowgroup_mappings) )
+				$rgrp = $rowgroup_mappings[ $grpmatch[2] ];
+
+			#			$rgrp = isset($grpmatch[2]) ? (($grpmatch[2] == '^') ? 'head' : ( ($grpmatch[2] == '~') ? 'foot' : (($grpmatch[2] == '-') ? 'body' : '' ) ) ) : '';
 			$rgrpatts = isset($grpmatch[3]) ? $this->ParseBlockAttributes($grpmatch[3]) : '';
 			$row = $grpmatch[4];
 
-			if (preg_match("/^({$this->regex->a}{$this->regex->c}\. )(.*)/m", ltrim($row), $rmtch)) 
+			if (preg_match("/^({$this->regex->a}{$this->regex->c}\. )(.*)/m", ltrim($row), $rmtch))
 			{
 				$ratts = $this->ParseBlockAttributes($rmtch[1], 'tr');
 				$row = $rmtch[2];
-			} 
-			else 
+			}
+			else
 				$ratts = '';
 
 			$cells = array();
 			$cellctr = 0;
-			foreach(explode("|", $row) as $cell) 
+			foreach(explode("|", $row) as $cell)
 			{
 				$ctyp = "d";
 				if (preg_match("/^_/", $cell)) $ctyp = "h";
-				if (preg_match("/^(_?{$this->regex->s}{$this->regex->a}{$this->regex->c}\. )(.*)/", $cell, $cmtch)) 
+				if (preg_match("/^(_?{$this->regex->s}{$this->regex->a}{$this->regex->c}\. )(.*)/", $cell, $cmtch))
 				{
 					$catts = $this->ParseBlockAttributes($cmtch[1], 'td');
 					$cell = $cmtch[2];
@@ -967,7 +972,7 @@ class Textile extends AlpacaObject
 
 		$this->TriggerParseEvent( 'table:done' );
 		$table['end'] = $this->TryOutputHandler( 'TableEndHandler', $args );
-#		$this->dump( $table );
+		#		$this->dump( $table );
 
 		return $table['start'] . $table['caption'] . $table['colgroup'] . $table['rows'] . $table['end'];
 	}
@@ -1012,14 +1017,14 @@ class Textile extends AlpacaObject
 				$atts = $this->ParseBlockAttributes($atts);
 				$info['has_content'] = $has_content = (strlen($content) > 0);
 				$is_redcloth = ((strlen($listatts) > 0) && $has_content);
-				$info['listtype'] = $ltype = $this->getListType($thislist);	
-				$is_dlist = ('d' === $ltype); 
+				$info['listtype'] = $ltype = $this->getListType($thislist);
+				$is_dlist = ('d' === $ltype);
 
 				#
 				# In the case of redcloth textile -- $listatts will have the list attributes.
 				# In the case of php-textile 2.2+ -- $atts will have the list atts if the content is empty or it's a dl, else it will have the item atts (for ul+ol).
 				#
-				if ($is_redcloth) 
+				if ($is_redcloth)
 					$listatts = $this->ParseBlockAttributes($listatts);
 				elseif (!$has_content || $is_dlist )
 					$listatts = $atts;
@@ -1029,7 +1034,7 @@ class Textile extends AlpacaObject
 
 				$nextlist = '';
 				if (preg_match("/^([#*;:]+)({$this->regex->lc})[ .].*/", $nextline, $nm))
-					$nextlist = $nm[1]; 
+					$nextlist = $nm[1];
 
 				if ((strpos($lastlist, ';') !== false) && (strpos($thislist, ':') !== false)) {
 					$lists[$thislist] = 2; // We're already in a <dl> so flag not to start another  # QUESTION: why the magic number?
@@ -1043,7 +1048,7 @@ class Textile extends AlpacaObject
 
 					$this->TriggerParseEvent( 'list:start', $info );
 					$outline = $this->TryOutputHandler( 'ListStartHandler', $info );
-				} 
+				}
 
 				if( $has_content )
 				{
@@ -1052,8 +1057,8 @@ class Textile extends AlpacaObject
 					$outline .= $this->TryOutputHandler( 'ListStartItemHandler', $info );
 				}
 
-# This closes off the previous list item (if not empty and no increase in list nesting) list:end-item event...
-				if((strlen($nextlist) <= strlen($thislist))) 
+				# This closes off the previous list item (if not empty and no increase in list nesting) list:end-item event...
+				if((strlen($nextlist) <= strlen($thislist)))
 				{
 					$outline .= $this->TryOutputHandler( 'ListEndItemHandler', $info);
 					$this->TriggerParseEvent( 'list:end-item', $info );
@@ -1102,15 +1107,15 @@ class Textile extends AlpacaObject
 			\!				              # closing
 			(?::(\S+))? 	          # optional href
 			(?:[\]}]|(?=\s|$|\)))   # lookahead: space or end of string
-		/x", array(&$this, "_foundImage"), $text);
+			/x", array(&$this, "_foundImage"), $text);
 	}
 
 	public function _foundImage($m)
 	{
-		$this->TriggerParseEvent( 'image:image', $m );	
+		$this->TriggerParseEvent( 'image:image', $m );
 		$out = $this->TryOutputHandler('ImageHandler', $m);
 		if( false === $out )
-		  $out = $m[0];
+			$out = $m[0];
 		return $out;
 	}
 
@@ -1128,16 +1133,16 @@ class Textile extends AlpacaObject
 			(\/)?                  # $slash
 			([^\w\/;]*?)           # $post
 			([\]}]|(?=\s|$|\)))
-		/x', array(&$this, "_foundLink"), $text);
+			/x', array(&$this, "_foundLink"), $text);
 	}
 
 
 	public function _foundLink( &$m)
 	{
-		$this->TriggerParseEvent( 'link:link', $m );	
+		$this->TriggerParseEvent( 'link:link', $m );
 		$out = $this->TryOutputHandler('LinkHandler', $m);
 		if( false === $out )
-		  $out = $m[0];
+			$out = $m[0];
 		return $out;
 	}
 
@@ -1145,7 +1150,7 @@ class Textile extends AlpacaObject
 	public function ParseGlyphs($text)
 	{
 		// fix: hackish -- adds a space if final char of text is a double quote.
-#		$text = preg_replace('/"\z/', "\" ", $text);
+		#		$text = preg_replace('/"\z/', "\" ", $text);
 
 		#
 		#   We don't want to do glyph replacements inside any HTML tags that might be in the source text
@@ -1164,13 +1169,13 @@ class Textile extends AlpacaObject
 
 				foreach( $glyphs as $name => $regex ) {
 					$this->current_glyph = $name;
-	        $line = preg_replace_callback( $regex, array(&$this, "_FoundGlyph"), $line );
+					$line = preg_replace_callback( $regex, array(&$this, "_FoundGlyph"), $line );
 				}
 			}
 			$glyph_out[] = $line;
 		}
 		return join('', $glyph_out);
-		
+
 		return $text;
 	}
 
@@ -1203,22 +1208,22 @@ class Textile extends AlpacaObject
 	protected function _ParseFootnoteRefs($text)
 	{
 		return preg_replace(
-		  '/(?<=\S)\[([0-9]+)([\!]?)\](\s)?/Ue',
-		  '$this->_FootnoteRefFound(\'\1\',\'\2\',\'\3\')', 
+			'/(?<=\S)\[([0-9]+)([\!]?)\](\s)?/Ue',
+			'$this->_FootnoteRefFound(\'\1\',\'\2\',\'\3\')',
 			$text
-			);
+		);
 	}
 	protected function _FootnoteRefFound($id, $nolink, $t)
 	{
-		$this->TriggerParseEvent( 'graf:fnref' , $id , $nolink, $t );	
+		$this->TriggerParseEvent( 'graf:fnref' , $id , $nolink, $t );
 		return call_user_func( 'AlpacaOutputGenerator::FootnoteIDHandler', $id, $nolink, $t );
 	}
 
 
-  /**
+	/**
 	 * @method _ParseBlocks
 	 */
-  protected function _ParseBlocks( $text )
+	protected function _ParseBlocks( $text )
 	{
 		$find = $this->blocktags;
 
@@ -1227,7 +1232,7 @@ class Textile extends AlpacaObject
 		}
 		$tre  = implode('|', $find);
 
-    $blocks = explode("\n\n", $text);
+		$blocks = explode("\n\n", $text);
 
 		$tag = 'p';
 		$atts = $cite = $graf = $ext = '';
@@ -1237,10 +1242,10 @@ class Textile extends AlpacaObject
 		foreach($blocks as $block) {
 			$anon = 0;
 			if (preg_match("/^($tre)({$this->regex->a}{$this->regex->c})\.(\.?)(?::(\S+))? (.*)$/s", $block, $m)) {
-				
+
 				if ($ext) // last block was extended, so close it
 					$out[count($out)-1] .= $c1;
-				
+
 				list(,$tag,$atts,$ext,$cite,$graf) = $m; // new block
 				list($o1, $o2, $content, $c2, $c1, $eat) = $this->_FoundBlock(array(0,$tag,$atts,$ext,$cite,$graf));
 
@@ -1286,13 +1291,13 @@ class Textile extends AlpacaObject
 		}
 		if ($ext) $out[count($out)-1] .= $c1;
 		$out = implode("\n\n", $out);
-//$this->dump( $out );		
+		//$this->dump( $out );
 		return $out;
 	}
 
 	function HasRawText($text)
 	{
-	  # TODO This list needs to be expandable! This also has HTML in it -- so it shouldn't really be in the parser.
+		# TODO This list needs to be expandable! This also has HTML in it -- so it shouldn't really be in the parser.
 		// checks whether the text has text not already enclosed by a block tag
 		$r = trim(preg_replace('@<(p|blockquote|div|form|table|ul|ol|dl|pre|h\d)[^>]*?'.chr(62).'.*</\1>@s', '', trim($text)));
 		$r = trim(preg_replace('@<(hr|br)[^>]*?/>@', '', $r));
@@ -1304,7 +1309,7 @@ class Textile extends AlpacaObject
 	{
 		$name = "AlpacaOutputGenerator::$name";
 		if( !is_callable( $name ) )
-		  return false;	# TODO -- should this return $in if the output handler can't be found???
+			return false;	# TODO -- should this return $in if the output handler can't be found???
 
 		return call_user_func( $name, $in );
 	}
@@ -1331,7 +1336,7 @@ class Textile extends AlpacaObject
 		}
 
 		if (!$lite) {
-			$this->spans	
+			$this->spans
 				->enable('verbatim')
 				->enable('code')
 				->enable('pre');
@@ -1358,7 +1363,7 @@ class Textile extends AlpacaObject
 		$text = preg_replace('/glyph:([^<]+)/','$1',$text);	# Replace the glyph marker -- this was added for 2.2 to allow caps spans in table cells. Might be better to fix the table stuff!
 		$text = $this->retrieveTags($text);
 		$text = $this->RetrieveURLs($text);
-	
+
 		$this->TriggerParseEvent( 'doc:finals' );
 		$this->TryOutputHandler( 'Finals', $text );
 
@@ -1398,7 +1403,7 @@ class Textile extends AlpacaObject
 		if( ($this->lite === '') && array_key_exists( $roottag, $this->block_handlers ) && is_callable($this->block_handlers[$roottag]) ) {
 			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( $this->block_handlers[$roottag], $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
 		}
-	
+
 		#
 		# Otherwise try to pass controll to a standard output generator...
 		#
@@ -1406,10 +1411,10 @@ class Textile extends AlpacaObject
 			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( "AlpacaOutputGenerator::{$roottag}_BlockHandler", $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
 		}
 
-	  #
+		#
 		# Finally, pass control to the default output handler...
 		#
-		else 
+		else
 			list( $o1, $o2, $content, $c2, $c1, $eat ) = call_user_func( 'AlpacaOutputGenerator::default_BlockHandler', $tag, $att, $atts, $ext, $cite, $o1, $o2, $content, $c2, $c1, $eat );
 
 		$content = (!$eat) ? $this->_ParseParagraph($content) : '';
@@ -1425,8 +1430,8 @@ class Textile extends AlpacaObject
 		$listeners = @$this->parse_listeners[$name];
 		if( !empty($listeners) ) {
 			foreach( $listeners as $listener ) {
-  			$args = func_get_args();
-	  		call_user_func( $listener, $args );
+				$args = func_get_args();
+				call_user_func( $listener, $args );
 			}
 		}
 		$listeners = @$this->parse_listeners['*'];	# Send the event to any 'global' event listeners...
