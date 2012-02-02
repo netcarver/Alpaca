@@ -597,7 +597,7 @@ class Textile extends AlpacaObject
 			}
 
 			# Only allow a restricted subset of the CSS standard characters for classes/ids. No encoding markers allowed...
-			if (preg_match("/\(([-a-zA-Z0-9_\.\:\#]+)\)/U", $matched, $cls)) {
+			if (preg_match("/\(([-a-zA-Z 0-9_\.\:\#]+)\)/U", $matched, $cls)) {
 				$class = $cls[1];
 				$matched = str_replace($cls[0], '', $matched);
 			}
@@ -616,7 +616,7 @@ class Textile extends AlpacaObject
 				$style[] = "text-align:" . $this->HorizontalAlign($horiz[1]);
 
 			# If a textile class block attribute was found, split it into the css class and css id (if any)...
-			if (preg_match("/^([-a-zA-Z0-9_]*)#([-a-zA-Z0-9_\.\:]*)$/", $class, $ids)) {
+			if (preg_match("/^([-a-z A-Z0-9_]*)#([-a-zA-Z0-9_\.\:]*)$/", $class, $ids)) {
 				$id = $ids[2];
 				$class = $ids[1];
 			}
