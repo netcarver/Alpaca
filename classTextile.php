@@ -799,7 +799,7 @@ class Textile extends AlpacaObject
 	{
 		// in restricted mode, input has already been escaped
 		if ($this->restricted)
-			return $str;
+			return str_replace( '"', '&quot;', $str );
 		return $this->EncodeHTML($str, $quotes);
 	}
 	function CleanWhiteSpace($text)
