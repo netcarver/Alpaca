@@ -540,18 +540,24 @@ class Textile extends AlpacaObject
 		$tmp    = $in;
 		$before = -1;
 		$after  = 0;
-		while( $after != $before )
+		$i      = 0;
+		$max    = 3;
+		while( ($after != $before) && ($i < $max) )
 		{
 			$before = strlen( $tmp );
 			$tmp    = rawurldecode($tmp);
 			$after  = strlen( $tmp );
+			$i++;
 		}
 
-		$out = strtr( $tmp, array(
-			'"'=>'',
-			"'"=>'',
-			'='=>'',
-		));
+		if( $i === $max )
+			$out = '';
+		else
+			$out = strtr( $tmp, array(
+				'"'=>'',
+				"'"=>'',
+				'='=>'',
+			));
 		return $out;
 	}
 
